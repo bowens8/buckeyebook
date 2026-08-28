@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Standings · The Shoe Pool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="leaf">🍁</span><h1>THE <span>SHOE</span> POOL</h1></div>
+    <div class="balance-chip" id="balance-chip">—</div>
+  </header>
+  <nav class="tabs">
+    <a href="index.html">Home</a>
+    <a href="picks.html">Weekly Picks</a>
+    <a href="live.html">Live Bets</a>
+    <a href="sidebets.html">Active Sidebets</a>
+    <a href="ledger.html">Standings</a>
+    <a href="offline.html">Offline Entry</a>
+    <a href="rules.html">Rules</a>
+  </nav>
+
+  <div class="shell">
+    <div class="section-title"><h2>All-Time Leaderboard</h2><span class="sub">Net $ won/lost · 🍁 = upset call bonus</span></div>
+    <div class="card" id="standings"></div>
+
+    <div class="section-title"><h2>Your History</h2></div>
+    <div class="card" id="history"></div>
+
+    <div class="card" id="commish-tools" style="display:none;"></div>
+  </div>
+
+  <script type="module">
+    import { initAuth, highlightNav, initNetworkStatus } from "./js/app.js";
+    import { renderStandings, renderHistory, renderCommishTools } from "./js/ledger.js";
+
+    highlightNav();
+    initNetworkStatus();
+    initAuth(() => { renderStandings(); renderHistory(); renderCommishTools(); });
+  </script>
+</body>
+</html>

@@ -7,12 +7,12 @@ import { getFirestore, enableIndexedDbPersistence } from "https://www.gstatic.co
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyB-EoHSlmwYgtnsEaxF5Xy8XdcBXMVOUTw",
-  authDomain: "bet-now-26ed6.firebaseapp.com",
-  projectId: "bet-now-26ed6",
-  storageBucket: "bet-now-26ed6.firebasestorage.app",
-  messagingSenderId: "131024607206",
-  appId: "1:131024607206:web:d5975582e8fadb5bdd2827"
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_PROJECT.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -35,7 +35,7 @@ enableIndexedDbPersistence(db).catch((err) => {
 // COLLEGE FOOTBALL DATA (collegefootballdata.com) — free API key.
 // Get one at https://collegefootballdata.com/key
 // ============================================================
-export const CFBD_API_KEY = "PTw4FZi46rd/ZHVsOyD9Ek2PL7cRZglwF5xfq1Onm6EQL3QwvOipiFyzKLYwFYSM";
+export const CFBD_API_KEY = "YOUR_CFBD_API_KEY";
 
 // ============================================================
 // Commissioner unlock code — anyone entering this at login gets

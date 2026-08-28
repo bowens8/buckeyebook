@@ -1,0 +1,331 @@
+/* ============================================================
+   THE SHOE POOL — design tokens
+   Scarlet/black/gray stadium palette + buckeye-brown signature
+   Display: Anton (scoreboard numerals) / Oswald (labels)
+   Body/data: Inter
+   ============================================================ */
+
+:root {
+  --scarlet: #BB0000;
+  --scarlet-dark: #8a0000;
+  --black: #101010;
+  --charcoal: #1b1b1b;
+  --gray: #6b6b6b;
+  --gray-light: #a8a8a8;
+  --bone: #F1EFE9;
+  --buckeye: #5B3A29;
+  --buckeye-shine: #C89B6B;
+  --win: #2e7d4f;
+  --loss: #8a0000;
+  --push: #6b6b6b;
+
+  --radius: 3px;
+  --shadow: 0 6px 24px rgba(0,0,0,0.35);
+}
+
+* { box-sizing: border-box; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--black);
+  color: var(--bone);
+  font-family: 'Inter', -apple-system, sans-serif;
+  min-height: 100vh;
+}
+
+body {
+  background-image:
+    repeating-linear-gradient(90deg, transparent, transparent 78px, rgba(255,255,255,0.02) 78px, rgba(255,255,255,0.02) 80px);
+}
+
+h1, h2, h3, .display {
+  font-family: 'Anton', sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.label, nav a, button, .tier-tag {
+  font-family: 'Oswald', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+a { color: var(--bone); text-decoration: none; }
+
+/* ---------- layout shell ---------- */
+.shell { max-width: 960px; margin: 0 auto; padding: 0 20px 80px; }
+
+header.top {
+  background: linear-gradient(180deg, var(--charcoal) 0%, var(--black) 100%);
+  border-bottom: 4px solid var(--scarlet);
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header.top .brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+header.top .brand .leaf { font-size: 22px; }
+
+header.top h1 { font-size: 22px; color: var(--bone); }
+header.top h1 span { color: var(--scarlet); }
+
+.balance-chip {
+  background: var(--charcoal);
+  border: 1px solid var(--gray);
+  border-radius: var(--radius);
+  padding: 8px 14px;
+  font-family: 'Anton', sans-serif;
+  font-size: 18px;
+}
+.balance-chip .amt { color: var(--buckeye-shine); }
+
+nav.tabs {
+  display: flex;
+  background: var(--charcoal);
+  border-bottom: 1px solid #2a2a2a;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+nav.tabs a {
+  flex: 1;
+  text-align: center;
+  padding: 12px 8px;
+  font-size: 13px;
+  color: var(--gray-light);
+  border-bottom: 3px solid transparent;
+}
+nav.tabs a.active {
+  color: var(--bone);
+  border-bottom-color: var(--scarlet);
+  background: rgba(187,0,0,0.08);
+}
+
+/* ---------- scoreboard hero ---------- */
+.scoreboard {
+  margin-top: 24px;
+  background: var(--charcoal);
+  border: 1px solid #2a2a2a;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.scoreboard .cell { text-align: center; }
+.scoreboard .cell .num { font-family: 'Anton'; font-size: 38px; color: var(--scarlet); line-height: 1; }
+.scoreboard .cell .lbl { font-family: 'Oswald'; font-size: 11px; color: var(--gray-light); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 4px; }
+
+/* ---------- cards ---------- */
+.card {
+  background: var(--charcoal);
+  border: 1px solid #2a2a2a;
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-top: 16px;
+}
+.card h3 { font-size: 18px; margin-bottom: 12px; }
+
+.matchup {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid #262626;
+}
+.matchup:first-of-type { border-top: none; }
+.team-block { flex: 1; }
+.team-name { font-family: 'Oswald'; font-size: 15px; }
+.spread { color: var(--gray-light); font-size: 12px; }
+.vs { color: var(--gray); font-family: 'Anton'; font-size: 13px; padding: 0 8px; }
+
+button, .btn {
+  background: var(--scarlet);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+button:hover { background: var(--scarlet-dark); }
+button.ghost {
+  background: transparent;
+  border: 1px solid var(--gray);
+  color: var(--bone);
+}
+button.ghost:hover { border-color: var(--bone); }
+button.small { padding: 6px 10px; font-size: 11px; }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+input, select {
+  background: var(--black);
+  border: 1px solid #333;
+  color: var(--bone);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  font-family: 'Inter';
+  font-size: 13px;
+}
+
+/* ---------- tier tags (pick outcomes) ---------- */
+.tier-tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 2px;
+  margin-left: 6px;
+}
+.tier-tag.win { background: rgba(46,125,79,0.2); color: #6fd39a; border: 1px solid var(--win); }
+.tier-tag.loss { background: rgba(138,0,0,0.2); color: #ff8a8a; border: 1px solid var(--loss); }
+.tier-tag.push { background: rgba(107,107,107,0.2); color: var(--gray-light); border: 1px solid var(--push); }
+.tier-tag.pending { background: rgba(200,155,107,0.15); color: var(--buckeye-shine); border: 1px solid var(--buckeye); }
+
+/* ---------- buckeye leaf sticker tracker (signature element) ---------- */
+.helmet-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid #262626;
+}
+.helmet-row:first-of-type { border-top: none; }
+.helmet {
+  width: 34px; height: 26px;
+  background: var(--gray);
+  border-radius: 50% 50% 45% 45% / 60% 60% 40% 40%;
+  position: relative;
+  flex-shrink: 0;
+}
+.leaf-stickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  max-width: 140px;
+}
+.leaf-stickers span { font-size: 12px; }
+.player-name { font-family: 'Oswald'; flex: 1; }
+.player-net { font-family: 'Anton'; font-size: 15px; }
+.player-net.pos { color: var(--buckeye-shine); }
+.player-net.neg { color: #ff8a8a; }
+
+/* ---------- bet proposal / live feed ---------- */
+.bet-item {
+  border-left: 3px solid var(--scarlet);
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.02);
+  margin-top: 10px;
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+.bet-item .meta { color: var(--gray-light); font-size: 11px; margin-top: 4px; }
+.bet-item .responses { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.pill {
+  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  background: #262626;
+  color: var(--gray-light);
+}
+.pill.accepted { background: rgba(46,125,79,0.25); color: #6fd39a; }
+.pill.declined { background: rgba(138,0,0,0.25); color: #ff8a8a; }
+
+.section-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 28px;
+  margin-bottom: 4px;
+}
+.section-title .sub { color: var(--gray-light); font-size: 12px; font-family: 'Inter'; }
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--gray-light);
+  font-size: 13px;
+}
+
+/* ---------- hub: live scores ---------- */
+.scores-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+.score-card {
+  background: var(--black);
+  border: 1px solid #2a2a2a;
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.score-status {
+  font-family: 'Oswald';
+  font-size: 10px;
+  color: var(--scarlet);
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.score-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'Inter';
+  font-size: 13px;
+  padding: 2px 0;
+}
+.score-num { font-family: 'Anton'; color: var(--bone); }
+
+/* ---------- hub: money flow ---------- */
+.money-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+.money-label { font-size: 12px; color: var(--bone); }
+.money-type { display: block; font-size: 10px; color: var(--gray-light); }
+.money-bar-track {
+  background: var(--black);
+  border-radius: 10px;
+  height: 8px;
+  overflow: hidden;
+}
+.money-bar-fill {
+  background: linear-gradient(90deg, var(--scarlet), var(--buckeye-shine));
+  height: 100%;
+}
+.money-amt { font-family: 'Anton'; font-size: 14px; color: var(--buckeye-shine); text-align: right; min-width: 50px; }
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--charcoal);
+  border: 1px solid var(--scarlet);
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  font-size: 13px;
+  box-shadow: var(--shadow);
+  z-index: 100;
+}
+
+@media (max-width: 640px) {
+  .scoreboard { grid-template-columns: 1fr 1fr; }
+  header.top h1 { font-size: 17px; }
+}
