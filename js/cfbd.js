@@ -26,7 +26,7 @@ export async function syncWeek(year, week, seasonType = "regular") {
   ]);
 
   // Once the background engine has locked a line, a manual re-sync must
-  // never overwrite it — otherwise "the odds lock 24h out" would be a lie
+  // never overwrite it — otherwise "the odds lock 48h out" would be a lie
   // the moment someone re-syncs the week for a score refresh.
   const lockedIds = new Set(
     existingSnap.docs.filter(d => d.data().spreadLocked).map(d => d.data().cfbdId)
@@ -88,9 +88,9 @@ export async function fetchLines(trackedGames) {
 
 // ---------- live score polling (read-only wrapper around CFBD) ----------
 // Groups tracked games by year/week so a poll of many games only costs
-// one API call per distinct week. Returns a map keyed by cfbdId. Used by
-// live-data-engine.js, which is what actually writes results back to
-// Firestore — this function itself never touches the database.
+// one API call per distinct week. Returns a map keyed by cfbdId. The
+// automated version of this logic lives server-side in functions/index.js —
+// this client copy exists only for manual "backup" sync flows.
 export async function fetchLiveScores(trackedGames) {
   const byWeek = {};
   trackedGames.forEach(g => {

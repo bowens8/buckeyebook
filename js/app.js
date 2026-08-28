@@ -70,12 +70,11 @@ export function initAuth(onReady) {
     onSnapshot(ref, (s) => {
       currentUser = { uid: user.uid, ...s.data() };
       renderBalanceChip();
-      // Runs continuously in the background from here on, on whichever
-      // commissioner device happens to have a tab open — see
-      // live-data-engine.js for why this isn't tied to any one page.
-      if (currentUser.isCommissioner) {
-        import("./live-data-engine.js").then(m => m.startLiveDataEngine());
-      }
+      // Runs on ANY signed-in user's device — the app relies on
+      // whoever happens to have it open, rather than one specific
+      // commissioner tab. See live-data-engine.js for the trade-off
+      // this implies for the security rules.
+      import("./live-data-engine.js").then(m => m.startLiveDataEngine());
       if (onReady) onReady(currentUser);
     }, (err) => {
       // Without this, a Firestore permission error (e.g. rules not

@@ -1,10 +1,10 @@
 // ============================================================
 // HUB — live scoreboard strip + "where the money is" view.
-// Scores come straight from Firestore via onSnapshot — the
-// background engine (live-data-engine.js, running on whichever
-// commissioner device is open) is what keeps those fields fresh,
-// so every viewer here gets true real-time updates with zero
-// CFBD calls of their own.
+// Scores come straight from Firestore via onSnapshot — the background
+// live data engine (js/live-data-engine.js), running on whichever
+// signed-in user's device happens to be open, is what keeps those
+// fields fresh, so every viewer here gets true real-time updates with
+// zero CFBD calls of their own.
 // ============================================================
 import { db } from "./firebase-config.js";
 import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";

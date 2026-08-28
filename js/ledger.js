@@ -108,12 +108,13 @@ export function renderCommishTools() {
       <button type="submit" class="small">Add Matchup</button>
     </form>
 
-    <h4 style="font-family:'Oswald';font-size:13px;color:var(--buckeye-shine);margin-top:20px;">Settle a Game</h4>
+    <h4 style="font-family:'Oswald';font-size:13px;color:var(--buckeye-shine);margin-top:20px;">Manual Settle (backup only)</h4>
+    <p style="font-size:11px;color:var(--gray-light);">Games settle themselves automatically the moment CFBD reports a final score — you shouldn't normally need this. Use it only if a game somehow never auto-settles (e.g. CFBD data issue, or no commissioner tab was open when it finished).</p>
     <form id="settle-form" style="display:grid;gap:8px;max-width:360px;">
       <input name="gameId" placeholder="Game ID (from Weekly Picks page)" required />
       <input name="homeScore" type="number" placeholder="Home score" required />
       <input name="awayScore" type="number" placeholder="Away score" required />
-      <button type="submit" class="small">Settle Game</button>
+      <button type="submit" class="small ghost">Force Settle</button>
     </form>
   `;
 

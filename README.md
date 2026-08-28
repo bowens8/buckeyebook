@@ -46,12 +46,18 @@ Firestore backend, static frontend, deploys straight to GitHub Pages.
 - **Profile pictures** — click your avatar in the header to upload one;
   it's resized and compressed client-side to a small square, stored
   directly on your player doc (no separate storage service needed).
-- **Continuous live data engine** — while any commissioner device has a tab
-  open, scores refresh every 20 seconds during live games (5 minutes
-  otherwise) and write straight to Firestore, so everyone sees updates in
-  real time no matter which page they're on — not per-tab polling.
-- **Automatic spread lock, 24 hours before kickoff** — lines move freely
-  with the market until the 24-hour window, then freeze permanently. A
+- **Automatic games, scores, and settlement — driven by any signed-in
+  user, not just the commissioner.** A background engine
+  (`js/live-data-engine.js`) runs on whichever player's device happens
+  to have the app open: it pulls each week's games and spreads, polls
+  live scores, locks each spread 48 hours before its kickoff, and
+  settles finished games — no commissioner tab required, just *someone*
+  in the group logged in. This works because the Firestore rules trust
+  any signed-in player to drive these writes — see the trade-off note
+  in that file. (A real always-on Cloud Functions version also exists
+  in `functions/` as an optional upgrade — not required by default.)
+- **Automatic spread lock, 48 hours before kickoff** — lines move freely
+  with the market until the 48-hour window, then freeze permanently. A
   commissioner re-syncing a week afterward can't accidentally move a
   locked line; the sync explicitly skips any game already locked.
 - **Pregame vs. in-game odds are fully separate systems, on purpose.**
@@ -90,9 +96,27 @@ Firestore backend, static frontend, deploys straight to GitHub Pages.
 
 1. Register at [collegefootballdata.com/key](https://collegefootballdata.com/key)
    (free, instant).
-2. Paste it into `CFBD_API_KEY` in `js/firebase-config.js`.
+2. Paste it into `CFBD_API_KEY` in `js/firebase-config.js`. This is used
+   by the manual "backup" sync button on the Standings page.
 3. On the Standings page (as commissioner) you can now pull any week's
-   games + spreads with one click.
+   games + spreads with one click — but see 1c below for the version
+   that runs automatically without you doing this at all.
+
+## 1c. (Optional, skip by default) Cloud Functions backend
+
+The default setup — what you get by just following steps 1-5 below —
+runs entirely client-side: **any signed-in player's device** keeps games,
+scores, spread locks, and settlements refreshing automatically as long
+as *someone* in the group has the app open. No billing, no deploy step,
+nothing beyond the steps below. This is what the trade-off note in
+`js/live-data-engine.js` and the loosened Firestore rules are about —
+see that file for details.
+
+If you later want this running on Google's actual servers instead —
+genuinely 24/7 with zero dependency on anyone having a tab open, at the
+cost of enabling Firebase's Blaze plan and running `firebase deploy` —
+the code for that already exists in `functions/`. It's not required and
+isn't part of the default setup path; ask if you want to switch to it.
 
 ## 2. Deploy Firestore rules
 
@@ -144,11 +168,14 @@ apps already use, just a different endpoint and an API key.
 
 ## Notes on what's simplified for v1
 
-- **Settlement is client-triggered, not a Cloud Function.** Since this is
-  static hosting (no server), the commissioner's browser runs the payout
-  math directly against Firestore. That's fine for a closed friend-group
-  app; it just means the commissioner needs to actually click "Settle" —
-  nothing resolves itself automatically off a live score feed yet.
+- **Settlement is automatic, driven by any signed-in user's device.**
+  `live-data-engine.js` settles a game itself the moment CFBD reports it
+  final — no clicking required in normal operation, and it doesn't need
+  to be specifically the commissioner's device, just anyone's. The catch:
+  it only runs while *someone's* device has a tab open (see below), and
+  it relies on Firestore rules trusting any signed-in player to write
+  these results — there's no server backstop verifying the math. A
+  "Force Settle" button remains on Standings as a manual backup.
 - **Odds-based group bets don't yet cap the proposer's total exposure**
   if many people accept — worth adding a check in `live.js`'s `proposeBet`
   before you run a big group challenge with real money.
@@ -172,12 +199,19 @@ apps already use, just a different endpoint and an API key.
   phones both go offline and log conflicting entries for the same bet,
   both sets of writes will sync and apply — there's no conflict detection
   across devices, only within a single device's queue.
-- **The live data engine needs one commissioner tab open somewhere** —
-  it's not a real server job, just a background loop in whichever
-  commissioner browser session is active. If every commissioner closes
-  their tab, scores/spreads stop refreshing until one reopens the app
-  (existing data stays visible, it just stops updating). Moving this to
-  a scheduled Cloud Function is the natural next step if that matters.
+- **The security rules trust any signed-in player, not just the
+  commissioner, to write scores/spreads/settlements.** This is what
+  makes "any user's device keeps things fresh" possible without a real
+  backend — but it also means there's no server-side check stopping a
+  player from directly editing another player's balance if they wanted
+  to. Fine for a closed, trusted friend group; genuinely worth
+  reconsidering (via the optional `functions/` Cloud Functions path
+  instead) if the group ever grows past people you'd trust with that.
+- **This engine needs *someone's* device open somewhere** — not
+  specifically the commissioner's anymore, but still not a real 24/7
+  server job. If literally everyone closes the app, data stops
+  refreshing until someone reopens it (existing data stays visible, it
+  just stops updating in the meantime).
 
 ## File map
 
@@ -193,12 +227,13 @@ login.html             account creation / sign in
 css/style.css          OSU scarlet/black scoreboard design system
 js/firebase-config.js    ← put your Firebase + CFBD keys here
 js/app.js              auth, live balance chip, transaction helpers, offline balance adjust
-js/cfbd.js              CollegeFootballData sync + live score polling
+js/cfbd.js              CollegeFootballData sync (used by both the manual backup button and live-data-engine.js)
 js/picks.js             picks UI + settlement math
 js/live.js              live bet propose/accept/resolve logic + reusable feed renderer
 js/hub.js               home page live scores + money flow (reads only — engine writes)
-js/live-data-engine.js   background: continuous score polling + 24h spread lock
 js/ledger.js            leaderboard + commissioner tools
 js/offline.js           offline entry form logic
-firestore.rules         security rules — deploy these before real money
+js/live-data-engine.js   background: continuous score polling, 48h spread lock, auto-settle — runs on any signed-in user's device
+functions/               optional: real always-on Cloud Functions alternative, not used by default
+firestore.rules         security rules — deploy these before real money (note the trust trade-off documented inline)
 ```

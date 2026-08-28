@@ -70,6 +70,9 @@
       <h4>Against the spread (ATS)</h4>
       <p>You're betting whether your team beats the spread, not just whether they win. A team that's +7 only needs
         to lose by 6 or fewer (or win outright) to "cover." A team that's -7 needs to win by more than 7.</p>
+      <h4>Settlement</h4>
+      <p>Payouts happen on their own — the moment a game's final score comes in, every pick on it settles and pays
+        out automatically. Nothing to wait on from the commissioner.</p>
     </div>
 
     <div id="scoring" class="card rule-section">
@@ -116,15 +119,17 @@ final_multiplier = tier_base × scaling</div>
 
     <div id="lines" class="card rule-section">
       <h3>3. Line Locking</h3>
-      <p>The point spread for weekly picks moves with the market right up until <strong>24 hours before kickoff</strong>,
+      <p>The point spread for weekly picks moves with the market right up until <strong>48 hours before kickoff</strong>,
         at which point it locks permanently. This mirrors a real sportsbook's opening line vs. closing line — you're
         never picking against a number that quietly moved on you after you locked in.</p>
       <ul>
-        <li>Before the 24-hour window: the spread can shift as new lines come in.</li>
-        <li>Inside the 24-hour window: whatever the line is gets frozen and never changes again, even if the
+        <li>Before the 48-hour window: the spread can shift as new lines come in.</li>
+        <li>Inside the 48-hour window: whatever the line is gets frozen and never changes again, even if the
           commissioner re-syncs that week for other reasons.</li>
         <li>You can still place, change, or cancel your <em>pick</em> right up until kickoff — it's only the number
-          itself (the spread) that locks 24 hours early, not your ability to act on it.</li>
+          itself (the spread) that locks 48 hours early, not your ability to act on it.</li>
+        <li>None of this needs a commissioner to trigger anything — games appear, spreads move and lock, scores
+          update, and finished games settle entirely on their own in the background.</li>
       </ul>
     </div>
 
@@ -168,7 +173,7 @@ final_multiplier = tier_base × scaling</div>
         same bet.
       </div>
       <p>The weekly pick spread and live bet odds are completely separate systems on purpose — the spread is the one
-        number every pregame pick settles against, so it has to stop moving 24 hours out. Live odds are a
+        number every pregame pick settles against, so it has to stop moving 48 hours out. Live odds are a
         conversation happening in real time during the game, so they stay fluid until the bet is settled.</p>
     </div>
 

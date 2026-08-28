@@ -1,0 +1,11 @@
+{
+  "name": "shoe-pool-functions",
+  "description": "Scheduled backend jobs for The Shoe Pool — game sync, live score polling, 48h spread lock, and auto-settlement. Runs independently of any browser tab.",
+  "engines": { "node": "20" },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.1.0",
+    "firebase-functions": "^5.0.0"
+  },
+  "private": true
+}

@@ -9,30 +9,41 @@ service cloud.firestore {
         get(/databases/$(database)/documents/players/$(request.auth.uid)).data.isCommissioner == true;
     }
 
-    // Everyone can read the roster/standings; players can only edit their own doc,
-    // and balance/leaf edits happen via transactions run from the client SDK.
+    // Everyone can read the roster/standings. Players can edit their own
+    // doc as always; balance/allTimeNet updates to OTHER players are also
+    // allowed from any signed-in user now, not just the commissioner —
+    // that's what lets the live data engine's auto-settlement run from
+    // whichever player's device happens to be polling when a game ends.
+    // TRADE-OFF: this means any signed-in player's client can, in
+    // principle, write directly to another player's balance — there's no
+    // server backstop verifying the settlement math anymore. Acceptable
+    // for a closed friend-group app running on trust; if that ever stops
+    // being true, tighten this back to isMe(uid) || isCommissioner().
     match /players/{uid} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && isMe(uid);
-      allow update: if isSignedIn() && (isMe(uid) || isCommissioner());
+      allow update: if isSignedIn();
     }
 
-    // Games are commissioner-managed, readable by all.
+    // Games: readable by all, writable by any signed-in user — this is
+    // what lets any player's device act as the live-data engine (score
+    // polling, spread locking, settlement) rather than requiring a
+    // specific commissioner tab to be open.
     match /games/{gameId} {
       allow read: if isSignedIn();
-      allow write: if isCommissioner();
+      allow write: if isSignedIn();
     }
 
     // Picks: anyone can read the board; a player can only create their OWN
-    // pick. They can also edit or cancel their own pick, but only before
-    // kickoff and only while it's unsettled — the moment the game starts,
-    // this falls through to commissioner-only, same hard lock as picks.js
-    // enforces in the UI. Belt-and-suspenders: even a modified client
-    // can't sneak an edit through after kickoff.
+    // pick, and can edit or cancel it themselves before kickoff while
+    // unsettled. Marking a pick settled (auto-settlement) is allowed from
+    // any signed-in user for the same reason as games above — whichever
+    // device is polling drives the payout math.
     match /picks/{pickId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && request.resource.data.playerId == request.auth.uid;
-      allow update, delete: if isCommissioner() || (
+      allow update: if isSignedIn();
+      allow delete: if isCommissioner() || (
         isSignedIn() &&
         resource.data.playerId == request.auth.uid &&
         resource.data.settled == false &&

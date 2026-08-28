@@ -184,7 +184,16 @@ export async function settleGame(gameId, homeScore, awayScore) {
   const spread = game.spread ?? 0; // negative = home favored
   const actualMargin = homeScore - awayScore; // positive = home won by X
 
-  const picks = picksSnap.docs.map(d => ({ ref: d.ref, ...d.data() }));
+  // Only ever process picks that haven't been paid out yet. This guards
+  // against double-settlement if the auto-settle engine and a manual
+  // "Force Settle" both end up touching the same game — without this,
+  // re-running settlement would recompute the pot from already-paid
+  // picks and pay everyone twice.
+  const picks = picksSnap.docs.map(d => ({ ref: d.ref, ...d.data() })).filter(p => !p.settled);
+  if (!picks.length) {
+    console.warn(`settleGame(${gameId}) called with nothing left to settle — skipping.`);
+    return;
+  }
   const pot = picks.reduce((s, p) => s + p.wagerAmount, 0);
 
   const scored = picks.map(p => {
