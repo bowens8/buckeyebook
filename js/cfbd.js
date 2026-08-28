@@ -63,6 +63,38 @@ export async function syncWeek(year, week, seasonType = "regular") {
   return count;
 }
 
+// ---------- auto-discover and sync the current + next CFBD week ----------
+// Uses CFBD's own calendar data to figure out which week it actually is —
+// no one has to know or enter a week number. Called automatically by
+// live-data-engine.js so games appear without any manual sync click.
+export async function autoSyncActiveWeeks() {
+  const year = new Date().getUTCFullYear();
+  const calendar = await cfbdGet(`/calendar?year=${year}`);
+  const now = Date.now();
+  const regular = calendar
+    .filter(w => w.seasonType === "regular")
+    .sort((a, b) => new Date(a.firstGameStart) - new Date(b.firstGameStart));
+
+  // "Current" = the week whose date range we're inside (with a few days
+  // of slack), or the nearest upcoming one if we're between weeks.
+  let current = regular.find(w => {
+    const start = new Date(w.firstGameStart).getTime() - 3 * 24 * 60 * 60 * 1000;
+    const end = new Date(w.lastGameStart).getTime() + 24 * 60 * 60 * 1000;
+    return now >= start && now <= end;
+  });
+  if (!current) {
+    current = regular.find(w => new Date(w.firstGameStart).getTime() > now) || regular[regular.length - 1];
+  }
+  const idx = regular.indexOf(current);
+  const weeks = [current, regular[idx + 1]].filter(Boolean);
+
+  let total = 0;
+  for (const w of weeks) {
+    total += await syncWeek(year, w.week, "regular");
+  }
+  return total;
+}
+
 // ---------- line polling (read-only, client-side) ----------
 // Same grouping trick as fetchLiveScores — one call per distinct
 // year/week rather than one per game. Returns cfbdId -> spread.
@@ -88,9 +120,8 @@ export async function fetchLines(trackedGames) {
 
 // ---------- live score polling (read-only wrapper around CFBD) ----------
 // Groups tracked games by year/week so a poll of many games only costs
-// one API call per distinct week. Returns a map keyed by cfbdId. The
-// automated version of this logic lives server-side in functions/index.js —
-// this client copy exists only for manual "backup" sync flows.
+// one API call per distinct week. Returns a map keyed by cfbdId. Used
+// by live-data-engine.js for continuous score refresh.
 export async function fetchLiveScores(trackedGames) {
   const byWeek = {};
   trackedGames.forEach(g => {

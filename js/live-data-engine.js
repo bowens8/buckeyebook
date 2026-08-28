@@ -16,11 +16,12 @@
 // ============================================================
 import { db } from "./firebase-config.js";
 import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { fetchLiveScores, fetchLines } from "./cfbd.js";
+import { fetchLiveScores, fetchLines, autoSyncActiveWeeks } from "./cfbd.js";
 import { currentUser } from "./app.js";
 import { settleGame } from "./picks.js";
 
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000;
+const AUTO_SYNC_THROTTLE_MS = 12 * 60 * 60 * 1000; // don't re-check the calendar more than twice a day per device
 let trackedGames = [];
 let engineStarted = false;
 
@@ -43,6 +44,12 @@ async function scheduleNext() {
 async function tick() {
   // Any signed-in user can drive this now — no isCommissioner check.
   if (!currentUser) return;
+
+  // This runs BEFORE the "any games tracked?" check below — otherwise a
+  // brand new pool with zero games would never get past the empty-check
+  // to discover any in the first place.
+  await maybeAutoSyncWeeks();
+
   const pollable = trackedGames.filter(g => g.year && g.week);
   if (!pollable.length) return;
 
@@ -95,6 +102,23 @@ async function tick() {
       updates.lastPolledAt = serverTimestamp();
       updateDoc(doc(db, "games", g.id), updates).catch(err => console.warn("Score write failed for", g.id, err));
     }
+  }
+}
+
+// Throttled per-device via localStorage — CFBD's calendar endpoint and a
+// full games+lines pull is more expensive than a score poll, so this
+// only actually runs a couple of times a day per device rather than on
+// every single tick. A brand new pool with zero games still gets synced
+// on the very first tick, since there's nothing in localStorage yet.
+async function maybeAutoSyncWeeks() {
+  const last = parseInt(localStorage.getItem("shoepool_last_auto_sync") || "0", 10);
+  if (Date.now() - last < AUTO_SYNC_THROTTLE_MS) return;
+  try {
+    const count = await autoSyncActiveWeeks();
+    localStorage.setItem("shoepool_last_auto_sync", String(Date.now()));
+    if (count) console.log(`Auto-synced ${count} games from CFBD.`);
+  } catch (err) {
+    console.warn("Auto week-sync failed", err);
   }
 }
 
