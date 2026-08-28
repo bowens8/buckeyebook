@@ -4,12 +4,12 @@
 // document, so players accept/decline independently in parallel
 // with zero write contention on the parent bet doc.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828h";
+import { db } from "./firebase-config.js?v=20260828i";
 import {
   collection, doc, addDoc, getDocs, getDoc, onSnapshot, query, where,
   serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance } from "./app.js?v=20260828h";
+import { currentUser, debitBalance, creditBalance } from "./app.js?v=20260828i";
 
 const playerPickerEl = document.getElementById("invite-players");
 

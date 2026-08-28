@@ -4,7 +4,7 @@
 // keyed by CFBD's own game id so re-syncing never duplicates.
 // Commissioner-only action, triggered from ledger.html.
 // ============================================================
-import { db, CFBD_API_KEY } from "./firebase-config.js?v=20260828h";
+import { db, CFBD_API_KEY } from "./firebase-config.js?v=20260828i";
 import { doc, getDoc, setDoc, getDocs, collection, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const BASE = "https://api.collegefootballdata.com";

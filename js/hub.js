@@ -6,7 +6,7 @@
 // fields fresh, so every viewer here gets true real-time updates with
 // zero CFBD calls of their own.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828h";
+import { db } from "./firebase-config.js?v=20260828i";
 import { collection, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const scoresEl = document.getElementById("live-scores");
