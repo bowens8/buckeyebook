@@ -51,7 +51,7 @@ export function initAuth(onReady) {
       // the missing profile on the spot breaks that loop for good.
       try {
         await setDoc(ref, {
-          displayName: user.email?.split("@")[0] || "Player",
+          displayName: "New Player", // rename anytime by clicking your name in the header
           balance: STARTING_BALANCE,
           startingBalance: STARTING_BALANCE,
           isCommissioner: false,
@@ -98,11 +98,21 @@ function renderBalanceChip() {
   if (chip && currentUser) {
     const net = currentUser.balance - (currentUser.startingBalance ?? 500);
     const sign = net >= 0 ? "+" : "";
-    chip.innerHTML = `${currentUser.displayName} · <span class="amt">$${currentUser.balance}</span>
+    chip.innerHTML = `<a href="#" onclick="editName();return false;" style="color:inherit;text-decoration:none;" title="Click to rename">${currentUser.displayName}</a> · <span class="amt">$${currentUser.balance}</span>
       <span style="font-family:'Inter';font-size:11px;color:${net >= 0 ? "#6fd39a" : "#ff8a8a"};margin-left:6px;">${sign}${net}</span>
       <a href="#" onclick="logOut();return false;" style="font-family:'Inter';font-size:11px;color:var(--gray-light);margin-left:10px;">Log out</a>`;
   }
 }
+
+async function editName() {
+  if (!currentUser) return;
+  const name = prompt("Your name:", currentUser.displayName);
+  if (!name || !name.trim() || name.trim() === currentUser.displayName) return;
+  const { updateDoc, doc: docRef } = await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js");
+  await updateDoc(docRef(db, "players", currentUser.uid), { displayName: name.trim() });
+  toast("Name updated.");
+}
+window.editName = editName;
 
 // ---------- nav highlight ----------
 export function highlightNav() {
@@ -113,11 +123,20 @@ export function highlightNav() {
 }
 
 // ---------- online/offline indicator ----------
+// Slots inline next to the balance chip if the header has a spot for it
+// (net-status-slot), falling back to a small fixed badge otherwise —
+// avoids floating on top of the nav bar like it used to.
 export function initNetworkStatus() {
-  const badge = document.createElement("div");
+  const slot = document.getElementById("net-status-slot");
+  const badge = document.createElement("span");
   badge.id = "net-status";
-  badge.style.cssText = "position:fixed;top:70px;right:8px;font-family:'Oswald';font-size:10px;padding:4px 8px;border-radius:10px;z-index:200;letter-spacing:0.05em;";
-  document.body.appendChild(badge);
+  if (slot) {
+    badge.style.cssText = "font-family:'Oswald';font-size:10px;padding:3px 8px;border-radius:10px;letter-spacing:0.05em;white-space:nowrap;";
+    slot.appendChild(badge);
+  } else {
+    badge.style.cssText = "position:fixed;top:8px;right:8px;font-family:'Oswald';font-size:10px;padding:4px 8px;border-radius:10px;z-index:200;letter-spacing:0.05em;";
+    document.body.appendChild(badge);
+  }
   const update = () => {
     const online = navigator.onLine;
     badge.textContent = online ? "● LIVE" : "● OFFLINE — QUEUED";
