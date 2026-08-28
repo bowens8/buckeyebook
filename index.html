@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Shoe Pool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="leaf">🍁</span><h1>THE <span>SHOE</span> POOL</h1></div>
+    <div class="balance-chip" id="balance-chip">—</div>
+  </header>
+  <nav class="tabs">
+    <a href="index.html">Home</a>
+    <a href="picks.html">Weekly Picks</a>
+    <a href="live.html">Live Bets</a>
+    <a href="sidebets.html">Active Sidebets</a>
+    <a href="ledger.html">Standings</a>
+    <a href="offline.html">Offline Entry</a>
+    <a href="rules.html">Rules</a>
+  </nav>
+
+  <div class="shell">
+    <div class="scoreboard">
+      <div class="cell"><div class="num" id="stat-players">-</div><div class="lbl">Players</div></div>
+      <div class="cell"><div class="num" id="stat-games">-</div><div class="lbl">Games This Week</div></div>
+      <div class="cell"><div class="num" id="stat-pot">-</div><div class="lbl">$ In Play</div></div>
+    </div>
+
+    <div class="section-title"><h2>Live Scores</h2><span class="sub">Refreshes every 45s</span></div>
+    <div class="card">
+      <div class="scores-strip" id="live-scores"></div>
+    </div>
+
+    <div class="section-title"><h2>Where the Money's Going</h2><span class="sub">Weekly pots + active sidebets, real-time</span></div>
+    <div class="card">
+      <div id="money-flow"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { db } from "./js/firebase-config.js";
+    import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+    import { initAuth, highlightNav, initNetworkStatus } from "./js/app.js";
+    import { renderLiveScores, renderMoneyFlow } from "./js/hub.js";
+
+    highlightNav();
+    initNetworkStatus();
+    initAuth();
+
+    renderLiveScores();
+    renderMoneyFlow();
+
+    onSnapshot(collection(db, "players"), s => document.getElementById("stat-players").textContent = s.size);
+    onSnapshot(collection(db, "games"), s => document.getElementById("stat-games").textContent = s.size);
+    onSnapshot(collection(db, "picks"), s => {
+      const total = s.docs.reduce((sum, d) => sum + (d.data().wagerAmount || 0), 0);
+      document.getElementById("stat-pot").textContent = "$" + total;
+    });
+  </script>
+</body>
+</html>

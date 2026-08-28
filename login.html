@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Log In · The Shoe Pool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="shell" style="max-width:400px;padding-top:60px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:40px;">🍁</div>
+      <h1>THE <span style="color:var(--scarlet);">SHOE</span> POOL</h1>
+    </div>
+
+    <div class="card">
+      <h3 id="form-title">Log In</h3>
+      <form id="auth-form" style="display:grid;gap:10px;margin-top:10px;">
+        <input id="name" placeholder="Your name" required autocomplete="username" />
+        <input id="password" type="password" placeholder="Password" required autocomplete="current-password" />
+        <div id="signup-extra" style="display:none;">
+          <input id="commish-code" placeholder="Commissioner code (optional)" style="width:100%;" />
+        </div>
+        <button type="submit" id="submit-btn">Log In</button>
+      </form>
+      <p id="error-msg" style="color:#ff8a8a;font-size:12px;margin-top:8px;display:none;"></p>
+      <p style="font-size:12px;color:var(--gray-light);margin-top:14px;">
+        New here? <a href="#" id="toggle-mode" style="color:var(--buckeye-shine);">Create an account</a> instead.
+      </p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth, db, COMMISSIONER_CODE } from "./js/firebase-config.js";
+    import {
+      signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+    import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+
+    const STARTING_BALANCE = 500;
+    let mode = "login"; // or "signup"
+
+    const form = document.getElementById("auth-form");
+    const toggle = document.getElementById("toggle-mode");
+    const errorMsg = document.getElementById("error-msg");
+
+    // If already logged in, skip straight to the app.
+    onAuthStateChanged(auth, (user) => { if (user) location.href = "index.html"; });
+
+    toggle.addEventListener("click", (e) => {
+      e.preventDefault();
+      mode = mode === "login" ? "signup" : "login";
+      document.getElementById("form-title").textContent = mode === "login" ? "Log In" : "Create Account";
+      document.getElementById("submit-btn").textContent = mode === "login" ? "Log In" : "Create Account";
+      document.getElementById("signup-extra").style.display = mode === "signup" ? "block" : "none";
+      toggle.textContent = mode === "login" ? "Create an account" : "Log in";
+      errorMsg.style.display = "none";
+    });
+
+    // Firebase Auth needs an email — we synthesize one from the chosen
+    // name so players never have to think about email addresses at all.
+    function emailFor(name) {
+      const slug = name.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      return `${slug}@shoepool.local`;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorMsg.style.display = "none";
+      const name = document.getElementById("name").value.trim();
+      const password = document.getElementById("password").value;
+      const email = emailFor(name);
+
+      try {
+        if (mode === "login") {
+          await signInWithEmailAndPassword(auth, email, password);
+        } else {
+          const code = document.getElementById("commish-code").value.trim();
+          const cred = await createUserWithEmailAndPassword(auth, email, password);
+          await setDoc(doc(db, "players", cred.user.uid), {
+            displayName: name,
+            balance: STARTING_BALANCE,
+            startingBalance: STARTING_BALANCE,
+            isCommissioner: code === COMMISSIONER_CODE,
+            leafStickers: 0,
+            createdAt: serverTimestamp()
+          });
+        }
+        location.href = "index.html";
+      } catch (err) {
+        errorMsg.style.display = "block";
+        if (err.code === "auth/email-already-in-use") errorMsg.textContent = "That name's taken — log in instead, or pick another.";
+        else if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") errorMsg.textContent = "Wrong password.";
+        else if (err.code === "auth/user-not-found") errorMsg.textContent = "No account with that name — create one instead.";
+        else if (err.code === "auth/weak-password") errorMsg.textContent = "Password needs to be at least 6 characters.";
+        else errorMsg.textContent = "Something went wrong: " + err.message;
+      }
+    });
+  </script>
+</body>
+</html>

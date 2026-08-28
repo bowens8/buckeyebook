@@ -1,0 +1,45 @@
+// ============================================================
+// FIREBASE CONFIG — replace with YOUR project's values.
+// Firebase Console → Project Settings → General → Your apps → SDK config
+// ============================================================
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getFirestore, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyB-EoHSlmwYgtnsEaxF5Xy8XdcBXMVOUTw",
+  authDomain: "bet-now-26ed6.firebaseapp.com",
+  projectId: "bet-now-26ed6",
+  storageBucket: "bet-now-26ed6.firebasestorage.app",
+  messagingSenderId: "131024607206",
+  appId: "1:131024607206:web:d5975582e8fadb5bdd2827"
+};
+
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+
+// Offline persistence — this is what makes commissioner offline entry work.
+// Firestore caches reads locally and QUEUES writes made while offline,
+// then automatically syncs them the instant connectivity returns. No custom
+// sync code needed for this part; it's built into the SDK.
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code === "failed-precondition") {
+    console.warn("Offline persistence needs a single tab open — multiple tabs detected.");
+  } else if (err.code === "unimplemented") {
+    console.warn("This browser doesn't support offline persistence.");
+  }
+});
+
+// ============================================================
+// COLLEGE FOOTBALL DATA (collegefootballdata.com) — free API key.
+// Get one at https://collegefootballdata.com/key
+// ============================================================
+export const CFBD_API_KEY = "PTw4FZi46rd/ZHVsOyD9Ek2PL7cRZglwF5xfq1Onm6EQL3QwvOipiFyzKLYwFYSM";
+
+// ============================================================
+// Commissioner unlock code — anyone entering this at login gets
+// commissioner powers on their account. Change this before you
+// share the app with the group if you want it to stay a secret.
+// ============================================================
+export const COMMISSIONER_CODE = "buns";
