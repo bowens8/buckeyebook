@@ -24,8 +24,9 @@ Firestore backend, static frontend, deploys straight to GitHub Pages.
   the Standings page's "Commissioner Access" box for an existing account.
   Change it in `js/firebase-config.js` (`COMMISSIONER_CODE`) before you
   hand the app to the group if you want it to stay private.
-- **All-time leaderboard** — Standings page ranks everyone by net $ won/lost
-  since day one (not just current balance), live-updating.
+- **All-time leaderboard** — permanent, never reset by a settle-up. See
+  the two-figure money model note below for how this differs from your
+  current balance.
 - **Offline commissioner entry** — a dedicated Offline Entry page (visible
   only to commissioners) for logging bets and outcomes by hand with no
   signal. Firestore's offline persistence queues those writes on the
@@ -35,6 +36,16 @@ Firestore backend, static frontend, deploys straight to GitHub Pages.
   and every balance-changing action runs through a `runTransaction` (or,
   offline, an `increment()` field update — see note below) so two players
   acting at the same moment can never corrupt each other's balance.
+- **Two-figure money model** — your current balance (can go negative,
+  shown in the header) tracks what you actually owe or are owed right
+  now, while a separate all-time net figure (Standings leaderboard) is a
+  permanent running total that's never reset. The commissioner can
+  "Settle Up" any player once real-world payment happens — that zeroes
+  their current balance only, leaving their all-time leaderboard
+  position untouched.
+- **Profile pictures** — click your avatar in the header to upload one;
+  it's resized and compressed client-side to a small square, stored
+  directly on your player doc (no separate storage service needed).
 - **Continuous live data engine** — while any commissioner device has a tab
   open, scores refresh every 20 seconds during live games (5 minutes
   otherwise) and write straight to Firestore, so everyone sees updates in

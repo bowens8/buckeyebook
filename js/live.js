@@ -30,7 +30,7 @@ export async function loadRoster() {
 export async function proposeBet({ gameId, description, mode, scope, odds, invited }) {
   // mode: "odds" | "even"   scope: "group" | "open"
   const wager = parseInt(document.getElementById("propose-wager").value, 10);
-  if (!wager || wager > currentUser.balance) { toast("Check your wager amount."); return; }
+  if (!wager) { toast("Enter a wager amount."); return; }
 
   const betRef = await addDoc(collection(db, "live_bets"), {
     gameId: gameId || null,
@@ -75,7 +75,6 @@ export async function respondToBet(responseId, betId, decision, side, wagerAmoun
     await updateDocSafe(rref, { response: "declined", respondedAt: serverTimestamp() });
     return;
   }
-  if (wagerAmount > currentUser.balance) { toast("Not enough balance."); return; }
   await debitBalance(currentUser.uid, wagerAmount, "live_bet_accept", betId);
   await updateDocSafe(rref, {
     response: "accepted", side, wagerAmount,
@@ -92,7 +91,6 @@ async function updateDocSafe(ref, data) {
 
 // ---------- open pool join (no invite needed) ----------
 export async function joinOpenPool(betId, side, wagerAmount, currentOdds) {
-  if (wagerAmount > currentUser.balance) { toast("Not enough balance."); return; }
   await debitBalance(currentUser.uid, wagerAmount, "open_pool_join", betId);
   await addDoc(collection(db, "live_bet_responses"), {
     betId, playerId: currentUser.uid, playerName: currentUser.displayName,

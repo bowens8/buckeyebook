@@ -30,7 +30,7 @@
 <body>
   <header class="top">
     <div class="brand"><span class="leaf">🍁</span><h1>THE <span>SHOE</span> POOL</h1></div>
-    <div style="display:flex;align-items:center;gap:8px;"><div class="balance-chip" id="balance-chip">—</div><span id="net-status-slot"></span></div>
+    <div class="balance-chip" id="balance-chip">—</div>
   </header>
   <nav class="tabs">
     <a href="index.html">Home</a>
@@ -174,10 +174,22 @@ final_multiplier = tier_base × scaling</div>
 
     <div id="leaderboard" class="card rule-section">
       <h3>6. Standings & Leaderboard</h3>
-      <p>Everyone starts with the same balance. The Standings page ranks the group by <strong>net dollars won or
-        lost, all-time</strong> — not your current balance, so it stays a fair comparison even if someone's been
-        playing longer or wagering bigger.</p>
-      <p>Your personal transaction history is on the same page, showing every wager, refund, and payout individually.</p>
+      <p>Two numbers track your money, and they mean different things:</p>
+      <ul>
+        <li><strong>Current balance</strong> — what you actually owe or are owed right now, shown in the header.
+          This can go negative — you're not blocked from wagering just because you're already down. It only resets
+          when the commissioner marks you "settled up" after real money actually changes hands.</li>
+        <li><strong>All-time net</strong> — a permanent running total of every win and loss, shown on the Standings
+          page. This is what the leaderboard ranks on, and it's <em>never</em> reset by a settle-up — it's the
+          full historical record, independent of payout cycles.</li>
+      </ul>
+      <h4>Settling up</h4>
+      <p>When you actually pay or get paid in the real world, the commissioner hits "Settle Up" next to your name.
+        That zeroes out your current balance only — your all-time leaderboard position doesn't move. This lets the
+        group cash out periodically (end of week, end of season, whenever) without ever losing the historical
+        bragging-rights record of who's actually been the sharpest picker all year.</p>
+      <p>Your personal transaction history is on the same page, showing every wager, refund, payout, and settle-up
+        individually.</p>
     </div>
 
     <div id="offline" class="card rule-section">

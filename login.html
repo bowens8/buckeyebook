@@ -39,7 +39,7 @@
     } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
     import { doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-    const STARTING_BALANCE = 500;
+    const STARTING_BALANCE = 0;
     let mode = "login"; // or "signup"
 
     const form = document.getElementById("auth-form");
@@ -83,6 +83,7 @@
             displayName: name,
             balance: STARTING_BALANCE,
             startingBalance: STARTING_BALANCE,
+            allTimeNet: 0,
             isCommissioner: code === COMMISSIONER_CODE,
             leafStickers: 0,
             createdAt: serverTimestamp()

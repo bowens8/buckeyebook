@@ -7,7 +7,7 @@ import { db } from "./firebase-config.js";
 import {
   collection, addDoc, doc, updateDoc, onSnapshot, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser } from "./app.js";
+import { currentUser, settleUp } from "./app.js";
 import { settleGame } from "./picks.js";
 import { syncWeek } from "./cfbd.js";
 import { COMMISSIONER_CODE } from "./firebase-config.js";
@@ -16,22 +16,46 @@ const standingsEl = document.getElementById("standings");
 const historyEl = document.getElementById("history");
 const commishEl = document.getElementById("commish-tools");
 
-// ---------- all-time leaderboard, sorted by net (not raw balance) ----------
+// ---------- all-time leaderboard (permanent) + current balance (settleable) ----------
 export function renderStandings() {
   onSnapshot(collection(db, "players"), (snap) => {
     const players = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .map(p => ({ ...p, net: p.balance - (p.startingBalance ?? 500) }))
-      .sort((a, b) => b.net - a.net);
+      .sort((a, b) => (b.allTimeNet || 0) - (a.allTimeNet || 0));
 
-    standingsEl.innerHTML = players.map((p, i) => `
+    standingsEl.innerHTML = players.map((p, i) => {
+      const allTimeNet = p.allTimeNet || 0;
+      const bal = p.balance || 0;
+      return `
       <div class="helmet-row">
         <div style="width:20px;font-family:'Anton';color:var(--gray-light);">${i + 1}</div>
-        <div class="helmet"></div>
-        <div class="player-name">${p.displayName}${p.isCommissioner ? " 🎖️" : ""}</div>
+        ${p.avatarUrl
+          ? `<img src="${p.avatarUrl}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;" />`
+          : `<div class="helmet"></div>`}
+        <div class="player-name">${p.displayName}${p.isCommissioner ? " 🎖️" : ""}
+          <div style="font-size:10px;color:var(--gray-light);font-family:'Inter';">
+            currently ${bal < 0 ? "owes" : "is owed"} <strong style="color:${bal < 0 ? "#ff8a8a" : "#6fd39a"};">$${Math.abs(bal).toFixed(0)}</strong>
+          </div>
+        </div>
         <div class="leaf-stickers">${"🍁".repeat(Math.min(p.leafStickers || 0, 12))}</div>
-        <div class="player-net ${p.net >= 0 ? "pos" : "neg"}">${p.net >= 0 ? "+" : ""}$${p.net.toFixed(0)}</div>
+        <div style="text-align:right;">
+          <div class="player-net ${allTimeNet >= 0 ? "pos" : "neg"}">${allTimeNet >= 0 ? "+" : ""}$${allTimeNet.toFixed(0)}</div>
+          <div style="font-size:9px;color:var(--gray-light);font-family:'Inter';">all-time</div>
+          ${currentUser?.isCommissioner && bal !== 0 ? `<button class="small ghost" style="margin-top:4px;font-size:10px;padding:3px 8px;" data-settle="${p.id}" data-name="${p.displayName}" data-bal="${bal}">Settle Up</button>` : ""}
+        </div>
       </div>
-    `).join("") || `<div class="empty-state">No players yet.</div>`;
+    `;
+    }).join("") || `<div class="empty-state">No players yet.</div>`;
+
+    standingsEl.querySelectorAll("[data-settle]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const name = btn.dataset.name;
+        const bal = parseFloat(btn.dataset.bal);
+        const verb = bal < 0 ? "owes" : "is owed";
+        if (!confirm(`${name} currently ${verb} $${Math.abs(bal).toFixed(0)}. Confirm you've settled this in the real world and reset their balance to $0? (Their all-time leaderboard record is unaffected.)`)) return;
+        await settleUp(btn.dataset.settle);
+        toast(`${name} settled up.`);
+      });
+    });
   }, (err) => {
     console.error("Standings listener failed:", err);
     standingsEl.innerHTML = `<div class="empty-state">Couldn't load standings (${err.code}). Check that Firestore rules are published.</div>`;

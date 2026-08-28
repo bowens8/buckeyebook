@@ -127,7 +127,9 @@ async function handleSubmitPick(e, game, existingPick = null) {
   // against the player's true available balance, not double-counting
   // the amount already tied up in their existing pick.
   const availableBalance = existingPick ? currentUser.balance + existingPick.wagerAmount : currentUser.balance;
-  if (wager > availableBalance) { toast("You don't have that much in your balance."); return; }
+  // No balance ceiling — going negative is allowed (you settle up in
+  // the real world later), so there's nothing to block here beyond a
+  // sane positive number.
 
   try {
     if (existingPick) {
@@ -150,7 +152,7 @@ async function handleSubmitPick(e, game, existingPick = null) {
       toast(`Pick locked: $${wager} on ${side === "home" ? game.homeTeam : game.awayTeam}`);
     }
   } catch (err) {
-    toast("Couldn't save pick — insufficient balance.");
+    toast("Couldn't save pick — try again.");
   }
 }
 

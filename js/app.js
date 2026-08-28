@@ -11,7 +11,7 @@ import {
   addDoc, serverTimestamp, updateDoc, increment, setDoc
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-const STARTING_BALANCE = 500;
+const STARTING_BALANCE = 0;
 
 export let currentUser = null;   // { uid, displayName, balance, isCommissioner, leafStickers }
 
@@ -54,6 +54,7 @@ export function initAuth(onReady) {
           displayName: "New Player", // rename anytime by clicking your name in the header
           balance: STARTING_BALANCE,
           startingBalance: STARTING_BALANCE,
+          allTimeNet: 0,
           isCommissioner: false,
           leafStickers: 0,
           createdAt: serverTimestamp()
@@ -96,10 +97,12 @@ window.logOut = logOut;
 function renderBalanceChip() {
   const chip = document.getElementById("balance-chip");
   if (chip && currentUser) {
-    const net = currentUser.balance - (currentUser.startingBalance ?? 500);
-    const sign = net >= 0 ? "+" : "";
-    chip.innerHTML = `<a href="#" onclick="editName();return false;" style="color:inherit;text-decoration:none;" title="Click to rename">${currentUser.displayName}</a> · <span class="amt">$${currentUser.balance}</span>
-      <span style="font-family:'Inter';font-size:11px;color:${net >= 0 ? "#6fd39a" : "#ff8a8a"};margin-left:6px;">${sign}${net}</span>
+    const bal = currentUser.balance;
+    const avatarHtml = currentUser.avatarUrl
+      ? `<img src="${currentUser.avatarUrl}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:6px;cursor:pointer;" onclick="triggerAvatarUpload();" title="Click to change photo" />`
+      : `<span onclick="triggerAvatarUpload();" style="display:inline-block;width:24px;height:24px;border-radius:50%;background:var(--gray);vertical-align:middle;margin-right:6px;cursor:pointer;" title="Click to add a photo"></span>`;
+    chip.innerHTML = `${avatarHtml}<a href="#" onclick="editName();return false;" style="color:inherit;text-decoration:none;" title="Click to rename">${currentUser.displayName}</a> ·
+      <span class="amt" style="color:${bal < 0 ? "#ff8a8a" : "var(--buckeye-shine)"};">${bal < 0 ? "-" : ""}$${Math.abs(bal)}</span>
       <a href="#" onclick="logOut();return false;" style="font-family:'Inter';font-size:11px;color:var(--gray-light);margin-left:10px;">Log out</a>`;
   }
 }
@@ -114,6 +117,56 @@ async function editName() {
 }
 window.editName = editName;
 
+// ---------- profile picture ----------
+// Stored directly on the player doc as a small compressed data URL —
+// no Firebase Storage setup needed. Resized to 128x128 and re-encoded
+// as JPEG before upload, so even a large phone photo ends up a few KB,
+// well under Firestore's 1MB document limit.
+export function triggerAvatarUpload() {
+  if (!currentUser) return;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "image/*";
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const dataUrl = await resizeImageToDataUrl(file, 128);
+      const { updateDoc, doc: docRef } = await import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js");
+      await updateDoc(docRef(db, "players", currentUser.uid), { avatarUrl: dataUrl });
+      toast("Photo updated.");
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+      toast("Couldn't update photo — try a smaller image.");
+    }
+  };
+  input.click();
+}
+window.triggerAvatarUpload = triggerAvatarUpload;
+
+function resizeImageToDataUrl(file, size) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+    reader.onload = () => { img.src = reader.result; };
+    reader.onerror = reject;
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      // Center-crop to a square before scaling down.
+      const min = Math.min(img.width, img.height);
+      const sx = (img.width - min) / 2;
+      const sy = (img.height - min) / 2;
+      ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    };
+    img.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 // ---------- nav highlight ----------
 export function highlightNav() {
   const path = location.pathname.split("/").pop() || "index.html";
@@ -123,20 +176,12 @@ export function highlightNav() {
 }
 
 // ---------- online/offline indicator ----------
-// Slots inline next to the balance chip if the header has a spot for it
-// (net-status-slot), falling back to a small fixed badge otherwise —
-// avoids floating on top of the nav bar like it used to.
+// Fixed to the bottom-right corner, out of the way of the header/nav.
 export function initNetworkStatus() {
-  const slot = document.getElementById("net-status-slot");
-  const badge = document.createElement("span");
+  const badge = document.createElement("div");
   badge.id = "net-status";
-  if (slot) {
-    badge.style.cssText = "font-family:'Oswald';font-size:10px;padding:3px 8px;border-radius:10px;letter-spacing:0.05em;white-space:nowrap;";
-    slot.appendChild(badge);
-  } else {
-    badge.style.cssText = "position:fixed;top:8px;right:8px;font-family:'Oswald';font-size:10px;padding:4px 8px;border-radius:10px;z-index:200;letter-spacing:0.05em;";
-    document.body.appendChild(badge);
-  }
+  badge.style.cssText = "position:fixed;bottom:14px;right:14px;font-family:'Oswald';font-size:10px;padding:4px 10px;border-radius:10px;z-index:200;letter-spacing:0.05em;box-shadow:var(--shadow);";
+  document.body.appendChild(badge);
   const update = () => {
     const online = navigator.onLine;
     badge.textContent = online ? "● LIVE" : "● OFFLINE — QUEUED";
@@ -149,18 +194,20 @@ export function initNetworkStatus() {
   update();
 }
 
-// ---------- safe balance transaction (prevents overdraft races) ----------
-// Works identically online or offline: Firestore queues the transaction
-// locally when there's no connection and replays it the moment the
-// device reconnects, so commissioner offline entries settle correctly
-// without any special-case code here.
+// ---------- balance transactions ----------
+// `balance` is the current amount owed/owing right now — it CAN go
+// negative (you can lose more than you've put in) and gets zeroed out
+// by the commissioner once real-world payment happens. `allTimeNet` is
+// a permanent running total that only ever accumulates and is never
+// touched by a settle-up — that's what the all-time leaderboard ranks
+// on, so bragging rights survive every payout cycle.
 export async function debitBalance(uid, amount, reason, refId) {
   const ref = doc(db, "players", uid);
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const bal = snap.data().balance;
-    if (bal < amount) throw new Error("insufficient_balance");
-    tx.update(ref, { balance: bal - amount });
+    const net = snap.data().allTimeNet || 0;
+    tx.update(ref, { balance: bal - amount, allTimeNet: net - amount });
   });
   await addDoc(collection(db, "ledger"), {
     playerId: uid, amount: -amount, reason, refId, createdAt: serverTimestamp()
@@ -172,11 +219,30 @@ export async function creditBalance(uid, amount, reason, refId) {
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const bal = snap.data().balance;
-    tx.update(ref, { balance: bal + amount });
+    const net = snap.data().allTimeNet || 0;
+    tx.update(ref, { balance: bal + amount, allTimeNet: net + amount });
   });
   await addDoc(collection(db, "ledger"), {
     playerId: uid, amount, reason, refId, createdAt: serverTimestamp()
   });
+}
+
+// ---------- settle up (commissioner) ----------
+// Zeroes out a player's current balance once real-world payment has
+// happened — WITHOUT touching allTimeNet, so the leaderboard keeps the
+// full history of wins and losses forever, independent of payout cycles.
+export async function settleUp(uid) {
+  const ref = doc(db, "players", uid);
+  let priorBalance = 0;
+  await runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    priorBalance = snap.data().balance;
+    tx.update(ref, { balance: 0 });
+  });
+  await addDoc(collection(db, "ledger"), {
+    playerId: uid, amount: -priorBalance, reason: "settled_up_irl", refId: null, createdAt: serverTimestamp()
+  });
+  return priorBalance;
 }
 
 // ---------- offline-safe balance adjustment ----------
@@ -188,7 +254,7 @@ export async function creditBalance(uid, amount, reason, refId) {
 // the commissioner is trusted to enter correct numbers when off the grid.
 export async function adjustBalanceOffline(uid, delta, reason, refId) {
   const ref = doc(db, "players", uid);
-  await updateDoc(ref, { balance: increment(delta) });
+  await updateDoc(ref, { balance: increment(delta), allTimeNet: increment(delta) });
   await addDoc(collection(db, "ledger"), {
     playerId: uid, amount: delta, reason, refId, createdAt: serverTimestamp(), enteredOffline: true
   });
