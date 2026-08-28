@@ -89,7 +89,17 @@ export async function renderCommishTools() {
   }
   commishEl.style.display = "block";
 
-  const settings = await getSyncSettings();
+  // If this read fails (e.g. the settings rule isn't published yet),
+  // fall back to sensible defaults rather than letting the whole panel
+  // fail to render — losing every other commissioner tool over one
+  // settings read would be a bad trade.
+  let settings = { divisions: ["fbs"], conferences: [] };
+  try {
+    settings = await getSyncSettings();
+  } catch (err) {
+    console.warn("Couldn't load sync settings (using defaults):", err);
+  }
+
   const DIVISIONS = [
     { id: "fbs", label: "FBS" },
     { id: "fcs", label: "FCS" },
