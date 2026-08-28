@@ -17,10 +17,17 @@ let latestPicks = [];
 let latestBets = [];
 let latestResponses = [];
 
+const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule + picks.js
+function isWithinLockWindow(game) {
+  return game.kickoffMs && Date.now() >= (game.kickoffMs - LOCK_WINDOW_MS);
+}
+
 // ---------- live scores ----------
 export function renderLiveScores() {
   onSnapshot(collection(db, "games"), (snap) => {
-    latestGames = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    latestGames = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity));
     drawScores();
   });
 }
@@ -34,7 +41,7 @@ function drawScores() {
     const statusLabel = g.liveStatus === "final" ? "FINAL"
       : g.liveStatus === "live" ? `Q${g.period ?? "?"} ${g.clock ?? ""}`
       : new Date(g.kickoffMs || 0).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
-    const lineTag = g.spreadLocked
+    const lineTag = (g.spreadLocked || isWithinLockWindow(g))
       ? `<span class="pill" style="margin-left:4px;">line locked</span>`
       : g.spread != null ? `<span class="pill" style="margin-left:4px;">line moving</span>` : "";
     return `

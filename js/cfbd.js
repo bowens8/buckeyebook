@@ -17,6 +17,21 @@ async function cfbdGet(path) {
   return res.json();
 }
 
+// ---------- fetch the real list of conferences from CFBD ----------
+// Used to build an actual checkbox list in the commissioner UI instead
+// of making someone type in cryptic short codes from memory.
+let conferenceListCache = null;
+export async function fetchConferenceList() {
+  if (conferenceListCache) return conferenceListCache;
+  const list = await cfbdGet(`/conferences`);
+  conferenceListCache = list.map(c => ({
+    abbreviation: c.abbreviation || c.name,
+    name: c.name,
+    classification: (c.classification || "fbs").toLowerCase()
+  })).sort((a, b) => a.name.localeCompare(b.name));
+  return conferenceListCache;
+}
+
 // ---------- commissioner-controlled sync scope ----------
 // Which divisions (and optionally specific conferences within them) get
 // pulled in, both by the manual sync button and the auto-discovery

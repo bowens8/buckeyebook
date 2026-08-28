@@ -11,6 +11,16 @@ import {
 import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js";
 
 const gamesEl = document.getElementById("games-list");
+const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule
+
+// True once a game is inside its 48-hour lock window, regardless of
+// whether the background engine has actually flipped spreadLocked yet —
+// there's an unavoidable gap between crossing the threshold and the next
+// poll landing, and the UI shouldn't claim the line is "moving" during
+// that gap even if the stored value technically hasn't been frozen yet.
+function isWithinLockWindow(game) {
+  return game.kickoffMs && Date.now() >= (game.kickoffMs - LOCK_WINDOW_MS);
+}
 
 // ---------- render live games + this player's existing picks ----------
 export function renderGames() {
@@ -18,16 +28,30 @@ export function renderGames() {
     onSnapshot(collection(db, "picks"), (picksSnap) => {
       const allPicks = picksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       gamesEl.innerHTML = "";
-      gamesSnap.forEach(g => {
-        const game = { id: g.id, ...g.data() };
+
+      // Chronological order — earliest kickoff first. Games with no
+      // kickoff time yet (shouldn't normally happen) sort to the end.
+      const games = gamesSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity));
+
+      games.forEach(game => {
         const myPick = allPicks.find(p => p.gameId === game.id && p.playerId === currentUser?.uid);
         gamesEl.appendChild(renderMatchupCard(game, myPick, allPicks.filter(p => p.gameId === game.id)));
       });
-      if (!gamesSnap.size) {
+      if (!games.length) {
         gamesEl.innerHTML = `<div class="empty-state">No games loaded yet. Commissioner: add matchups in Firestore → games.</div>`;
       }
     });
   });
+}
+
+function formatKickoff(kickoffMs) {
+  if (!kickoffMs) return "Kickoff TBD";
+  const d = new Date(kickoffMs);
+  const datePart = d.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+  const timePart = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `${datePart} · ${timePart}`;
 }
 
 function renderMatchupCard(game, myPick, gamePicks) {
@@ -35,11 +59,14 @@ function renderMatchupCard(game, myPick, gamePicks) {
   div.className = "card";
   const locked = Date.now() > (game.kickoffMs || 0);
   const pot = gamePicks.reduce((s, p) => s + p.wagerAmount, 0);
-  const lineTag = game.spreadLocked
+  const lineTag = (game.spreadLocked || isWithinLockWindow(game))
     ? `<span class="tier-tag pending" style="margin-left:6px;">line locked</span>`
     : game.spread != null ? `<span class="tier-tag" style="margin-left:6px;background:rgba(255,255,255,0.08);color:var(--gray-light);">line moving</span>` : "";
 
   div.innerHTML = `
+    <div style="font-family:'Oswald';font-size:11px;color:var(--buckeye-shine);letter-spacing:0.05em;text-transform:uppercase;">
+      ${formatKickoff(game.kickoffMs)}
+    </div>
     <div class="matchup">
       <div class="team-block">
         <div class="team-name">${game.awayTeam}</div>

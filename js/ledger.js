@@ -9,7 +9,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { currentUser, settleUp } from "./app.js";
 import { settleGame } from "./picks.js";
-import { syncWeek, getSyncSettings, saveSyncSettings } from "./cfbd.js";
+import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js";
 import { COMMISSIONER_CODE } from "./firebase-config.js";
 
 const standingsEl = document.getElementById("standings");
@@ -100,6 +100,22 @@ export async function renderCommishTools() {
     console.warn("Couldn't load sync settings (using defaults):", err);
   }
 
+  // If either of these reads fails (e.g. rules not published yet, or a
+  // CFBD hiccup), fall back to sensible defaults rather than letting the
+  // whole panel fail to render.
+  let settings = { divisions: ["fbs"], conferences: [] };
+  let conferenceList = [];
+  try {
+    settings = await getSyncSettings();
+  } catch (err) {
+    console.warn("Couldn't load sync settings (using defaults):", err);
+  }
+  try {
+    conferenceList = await fetchConferenceList();
+  } catch (err) {
+    console.warn("Couldn't load conference list from CFBD:", err);
+  }
+
   const DIVISIONS = [
     { id: "fbs", label: "FBS" },
     { id: "fcs", label: "FCS" },
@@ -107,22 +123,45 @@ export async function renderCommishTools() {
     { id: "iii", label: "Division III" }
   ];
 
+  function renderConferenceCheckboxes(checkedDivisions) {
+    const relevant = conferenceList.filter(c => checkedDivisions.includes(c.classification));
+    if (!relevant.length) {
+      return conferenceList.length
+        ? `<p style="font-size:11px;color:var(--gray-light);">No conferences found for the selected division(s).</p>`
+        : `<p style="font-size:11px;color:var(--gray-light);">Couldn't load the conference list from CFBD — leave this blank to include every conference in the checked division(s) above.</p>`;
+    }
+    return `
+      <div style="max-height:180px;overflow-y:auto;border:1px solid #2a2a2a;border-radius:var(--radius);padding:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+        ${relevant.map(c => `
+          <label style="font-size:12px;display:flex;align-items:center;gap:5px;">
+            <input type="checkbox" name="conference" value="${c.abbreviation}" ${settings.conferences.includes(c.abbreviation) ? "checked" : ""} /> ${c.name}
+          </label>
+        `).join("")}
+      </div>
+    `;
+  }
+
   commishEl.innerHTML = `
     <h3>Commissioner Tools</h3>
 
     <h4 style="font-family:'Oswald';font-size:13px;color:var(--buckeye-shine);margin-top:16px;">What Gets Synced</h4>
-    <p style="font-size:11px;color:var(--gray-light);">Controls both the manual sync below AND the automatic background sync — pick which divisions (and optionally specific conferences) show up on Weekly Picks.</p>
-    <form id="scope-form" style="display:grid;gap:8px;max-width:420px;">
-      <div style="display:flex;gap:14px;flex-wrap:wrap;">
-        ${DIVISIONS.map(d => `
-          <label style="font-size:12px;display:flex;align-items:center;gap:5px;">
-            <input type="checkbox" name="division" value="${d.id}" ${settings.divisions.includes(d.id) ? "checked" : ""} /> ${d.label}
-          </label>
-        `).join("")}
+    <p style="font-size:11px;color:var(--gray-light);">Controls both the manual sync below AND the automatic background sync.</p>
+    <form id="scope-form" style="display:grid;gap:10px;max-width:460px;">
+      <div>
+        <div style="font-size:11px;color:var(--gray-light);margin-bottom:4px;">Divisions</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;">
+          ${DIVISIONS.map(d => `
+            <label style="font-size:12px;display:flex;align-items:center;gap:5px;">
+              <input type="checkbox" name="division" value="${d.id}" ${settings.divisions.includes(d.id) ? "checked" : ""} /> ${d.label}
+            </label>
+          `).join("")}
+        </div>
       </div>
-      <input name="conferences" placeholder="Optional: specific conferences only (comma-separated, e.g. B1G, SEC)" value="${settings.conferences.join(", ")}" style="width:100%;" />
-      <p style="font-size:10px;color:var(--gray-light);margin:0;">Leave conferences blank to include every conference within the checked division(s). Use CFBD's short codes (B1G, SEC, ACC, B12, etc.) — check collegefootballdata.com if you're not sure of one.</p>
-      <button type="submit" class="small">Save Sync Settings</button>
+      <div>
+        <div style="font-size:11px;color:var(--gray-light);margin-bottom:4px;">Conferences (leave all unchecked to include every conference in the divisions above)</div>
+        <div id="conference-checkboxes">${renderConferenceCheckboxes(settings.divisions)}</div>
+      </div>
+      <button type="submit" class="small" style="width:fit-content;">Save Sync Settings</button>
     </form>
     <p id="scope-status" style="font-size:12px;color:var(--gray-light);margin-top:6px;"></p>
 
@@ -158,10 +197,24 @@ export async function renderCommishTools() {
     const f = e.target;
     const divisions = [...f.querySelectorAll('input[name="division"]:checked')].map(cb => cb.value);
     if (!divisions.length) { toast("Pick at least one division."); return; }
-    const conferences = f.conferences.value.split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
+    const conferences = [...f.querySelectorAll('input[name="conference"]:checked')].map(cb => cb.value);
     await saveSyncSettings(divisions, conferences);
     document.getElementById("scope-status").textContent = "Saved — takes effect on the next sync (manual or automatic).";
     toast("Sync settings saved.");
+  });
+
+  // Re-render the conference list live as divisions are toggled, so it
+  // only ever shows conferences actually relevant to what's checked.
+  document.querySelectorAll('#scope-form input[name="division"]').forEach(cb => {
+    cb.addEventListener("change", () => {
+      const checkedDivisions = [...document.querySelectorAll('#scope-form input[name="division"]:checked')].map(c => c.value);
+      const previouslyChecked = [...document.querySelectorAll('#scope-form input[name="conference"]:checked')].map(c => c.value);
+      document.getElementById("conference-checkboxes").innerHTML = renderConferenceCheckboxes(checkedDivisions);
+      // Preserve whatever was already checked, in case it's still relevant.
+      document.querySelectorAll('#scope-form input[name="conference"]').forEach(c => {
+        if (previouslyChecked.includes(c.value)) c.checked = true;
+      });
+    });
   });
 
   document.getElementById("sync-form").addEventListener("submit", async (e) => {
