@@ -23,23 +23,44 @@ function isWithinLockWindow(game) {
 }
 
 // ---------- render live games + this player's existing picks ----------
+// Three sections, top to bottom: games people are actively picking,
+// then finished games under their own header, then games nobody's
+// touched yet. Each section internally sorted chronologically.
 export function renderGames() {
   onSnapshot(collection(db, "games"), (gamesSnap) => {
     onSnapshot(collection(db, "picks"), (picksSnap) => {
       const allPicks = picksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       gamesEl.innerHTML = "";
 
-      // Chronological order — earliest kickoff first. Games with no
-      // kickoff time yet (shouldn't normally happen) sort to the end.
-      const games = gamesSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .sort((a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity));
+      const byKickoff = (a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity);
+      const allGames = gamesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      games.forEach(game => {
-        const myPick = allPicks.find(p => p.gameId === game.id && p.playerId === currentUser?.uid);
-        gamesEl.appendChild(renderMatchupCard(game, myPick, allPicks.filter(p => p.gameId === game.id)));
-      });
-      if (!games.length) {
+      const isFinished = g => g.liveStatus === "final" || g.autoSettled === true;
+      const hasAnyPicks = g => allPicks.some(p => p.gameId === g.id);
+
+      const active = allGames.filter(g => !isFinished(g) && hasAnyPicks(g)).sort(byKickoff);
+      const finished = allGames.filter(isFinished).sort(byKickoff);
+      const untouched = allGames.filter(g => !isFinished(g) && !hasAnyPicks(g)).sort(byKickoff);
+
+      const renderSection = (games, headerText) => {
+        if (!games.length) return;
+        if (headerText) {
+          const header = document.createElement("div");
+          header.className = "section-title";
+          header.innerHTML = `<h2 style="font-size:18px;">${headerText}</h2>`;
+          gamesEl.appendChild(header);
+        }
+        games.forEach(game => {
+          const myPick = allPicks.find(p => p.gameId === game.id && p.playerId === currentUser?.uid);
+          gamesEl.appendChild(renderMatchupCard(game, myPick, allPicks.filter(p => p.gameId === game.id)));
+        });
+      };
+
+      renderSection(active, null); // no header — this is the "main" list at the top
+      renderSection(finished, "Finished");
+      renderSection(untouched, "Nobody's Picked Yet");
+
+      if (!allGames.length) {
         gamesEl.innerHTML = `<div class="empty-state">No games loaded yet. Commissioner: add matchups in Firestore → games.</div>`;
       }
     });
