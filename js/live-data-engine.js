@@ -14,11 +14,11 @@
 // Spread lock rule: once within 48 hours of kickoff, whatever line CFBD
 // is showing gets frozen permanently. Before that, it moves with CFBD.
 // ============================================================
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=20260828h";
 import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { fetchLiveScores, fetchLines, autoSyncActiveWeeks } from "./cfbd.js";
-import { currentUser } from "./app.js";
-import { settleGame } from "./picks.js";
+import { fetchLiveScores, fetchLines, autoSyncActiveWeeks } from "./cfbd.js?v=20260828h";
+import { currentUser } from "./app.js?v=20260828h";
+import { settleGame } from "./picks.js?v=20260828h";
 
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000;
 const AUTO_SYNC_THROTTLE_MS = 12 * 60 * 60 * 1000; // don't re-check the calendar more than twice a day per device
@@ -111,11 +111,11 @@ async function tick() {
 // every single tick. A brand new pool with zero games still gets synced
 // on the very first tick, since there's nothing in localStorage yet.
 async function maybeAutoSyncWeeks() {
-  const last = parseInt(localStorage.getItem("shoepool_last_auto_sync") || "0", 10);
+  const last = parseInt(localStorage.getItem("buckeyebook_last_auto_sync") || "0", 10);
   if (Date.now() - last < AUTO_SYNC_THROTTLE_MS) return;
   try {
     const count = await autoSyncActiveWeeks();
-    localStorage.setItem("shoepool_last_auto_sync", String(Date.now()));
+    localStorage.setItem("buckeyebook_last_auto_sync", String(Date.now()));
     if (count) console.log(`Auto-synced ${count} games from CFBD.`);
   } catch (err) {
     console.warn("Auto week-sync failed", err);

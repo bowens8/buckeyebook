@@ -1,4 +1,4 @@
-# The Shoe Pool
+# The Buckeye Book
 
 A real-time college football picks + live wagering app for the group.
 Firestore backend, static frontend, deploys straight to GitHub Pages.
@@ -7,7 +7,7 @@ Firestore backend, static frontend, deploys straight to GitHub Pages.
 
 - **Weekly ATS picks** — pari-mutuel pot, tiered + margin-scaled payouts
   (upset covers pay the most, capped at 3x scaling so no one game can drain
-  the pot). Outright upset calls also earn a 🍁 leaf sticker. Picks can be
+  the pot). Outright upset calls also earn a 🌰 buckeye sticker. Picks can be
   freely changed or cancelled (full refund) anytime before kickoff, then
   lock automatically — enforced both in the UI and in the Firestore rules
   themselves, so it can't be bypassed from a modified client.
@@ -149,14 +149,14 @@ Commissioner-only powers:
 ```bash
 git init
 git add .
-git commit -m "Shoe Pool v1"
+git commit -m "Buckeye Book v1"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/shoe-pool.git
+git remote add origin https://github.com/YOUR_USERNAME/buckeye-book-repo.git
 git push -u origin main
 ```
 
 Then: repo **Settings → Pages → Source → main branch → / (root)** → Save.
-Your app will be live at `https://YOUR_USERNAME.github.io/shoe-pool/`.
+Your app will be live at `https://YOUR_USERNAME.github.io/buckeye-book-repo/`.
 
 ## 5. Add this week's games
 
@@ -212,6 +212,26 @@ apps already use, just a different endpoint and an API key.
   server job. If literally everyone closes the app, data stops
   refreshing until someone reopens it (existing data stays visible, it
   just stops updating in the meantime).
+
+## Cache-busting on every deploy
+
+Every internal `import` in this project (in every `.html` and `.js` file)
+carries a `?v=20260828d` query string. Browsers cache ES modules
+aggressively — sometimes even surviving a hard refresh — so without this,
+redeploying a fixed file doesn't guarantee anyone's browser actually picks
+it up.
+
+**Bump this version string every time you deploy a change**, or browsers
+may keep serving the old cached version of whatever you just fixed. The
+easiest way: find-and-replace every `20260828d` in the project with a new
+value (today's date + a letter works fine, e.g. `20260901a`) before
+copying files into your repo. A one-liner from the project root:
+
+```bash
+grep -rl "20260828d" . --include="*.html" --include="*.js" | xargs sed -i '' 's/20260828d/YOUR_NEW_VERSION/g'
+```
+
+(On Linux, drop the empty `''` after `-i`.)
 
 ## File map
 

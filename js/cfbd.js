@@ -4,7 +4,7 @@
 // keyed by CFBD's own game id so re-syncing never duplicates.
 // Commissioner-only action, triggered from ledger.html.
 // ============================================================
-import { db, CFBD_API_KEY } from "./firebase-config.js";
+import { db, CFBD_API_KEY } from "./firebase-config.js?v=20260828h";
 import { doc, getDoc, setDoc, getDocs, collection, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const BASE = "https://api.collegefootballdata.com";
@@ -76,8 +76,16 @@ export async function syncWeek(year, week, seasonType = "regular") {
 
   // Merge + de-dupe by game id, since overlapping combos (e.g. two
   // conferences within the same division call) can return the same game.
+  // Also tag each game with which combo actually matched it, so the
+  // display layer (Home hub) can filter against CURRENT settings even
+  // if this game was originally synced under a looser/different scope.
   const gameById = new Map();
-  gameResults.flat().forEach(g => gameById.set(g.id, g));
+  gameResults.forEach((games, i) => {
+    const combo = combos[i];
+    games.forEach(g => {
+      if (!gameById.has(g.id)) gameById.set(g.id, { ...g, _syncDivision: combo.division, _syncConference: combo.conference });
+    });
+  });
   const games = [...gameById.values()];
   const lines = lineResults.flat();
 
@@ -103,6 +111,8 @@ export async function syncWeek(year, week, seasonType = "regular") {
       year, week, seasonType,
       homeTeam: g.homeTeam,
       awayTeam: g.awayTeam,
+      division: g._syncDivision,
+      conference: g._syncConference || g.homeConference || null,
       kickoffMs: g.startDate ? new Date(g.startDate).getTime() : null,
       venue: g.venue || null,
       status: "scheduled",

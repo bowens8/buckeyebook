@@ -1,5 +1,5 @@
 // ============================================================
-// SHOE POOL — SCHEDULED BACKEND
+// THE BUCKEYE BOOK — SCHEDULED BACKEND
 //
 // This runs on Google's infrastructure on a fixed schedule, completely
 // independent of whether anyone has the app open. It replaces what used

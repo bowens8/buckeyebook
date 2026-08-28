@@ -3,12 +3,12 @@
 // Each player's action (placing a pick) is its own transaction,
 // so simultaneous picks from different players never collide.
 // ============================================================
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=20260828h";
 import {
   collection, doc, addDoc, onSnapshot, query, where,
   serverTimestamp, runTransaction, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js";
+import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828h";
 
 const gamesEl = document.getElementById("games-list");
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule
@@ -57,8 +57,8 @@ export function renderGames() {
       };
 
       renderSection(active, null); // no header — this is the "main" list at the top
-      renderSection(finished, "Finished");
       renderSection(untouched, "Nobody's Picked Yet");
+      renderSection(finished, "Finished");
 
       if (!allGames.length) {
         gamesEl.innerHTML = `<div class="empty-state">No games loaded yet. Commissioner: add matchups in Firestore → games.</div>`;
@@ -79,24 +79,27 @@ function renderMatchupCard(game, myPick, gamePicks) {
   const div = document.createElement("div");
   div.className = "card";
   const locked = Date.now() > (game.kickoffMs || 0);
+  const isFinished = game.liveStatus === "final" || game.autoSettled === true;
   const pot = gamePicks.reduce((s, p) => s + p.wagerAmount, 0);
   const lineTag = (game.spreadLocked || isWithinLockWindow(game))
     ? `<span class="tier-tag pending" style="margin-left:6px;">line locked</span>`
     : game.spread != null ? `<span class="tier-tag" style="margin-left:6px;background:rgba(255,255,255,0.08);color:var(--gray-light);">line moving</span>` : "";
 
+  const bigScore = n => `<div style="font-family:'Anton';font-size:32px;color:var(--bone);line-height:1;">${n ?? "-"}</div>`;
+
   div.innerHTML = `
-    <div style="font-family:'Oswald';font-size:11px;color:var(--buckeye-shine);letter-spacing:0.05em;text-transform:uppercase;">
-      ${formatKickoff(game.kickoffMs)}
+    <div style="font-family:'Oswald';font-size:11px;color:${isFinished ? "var(--scarlet)" : "var(--buckeye-shine)"};letter-spacing:0.05em;text-transform:uppercase;">
+      ${isFinished ? "FINAL" : formatKickoff(game.kickoffMs)}
     </div>
     <div class="matchup">
       <div class="team-block">
         <div class="team-name">${game.awayTeam}</div>
-        <div class="spread">${spreadLabel(game, "away")}</div>
+        ${isFinished ? bigScore(game.awayScore) : `<div class="spread">${spreadLabel(game, "away")}</div>`}
       </div>
       <div class="vs">@</div>
       <div class="team-block" style="text-align:right">
         <div class="team-name">${game.homeTeam}</div>
-        <div class="spread">${spreadLabel(game, "home")}</div>
+        ${isFinished ? bigScore(game.homeScore) : `<div class="spread">${spreadLabel(game, "home")}</div>`}
       </div>
     </div>
     <div class="meta" style="color:var(--gray-light);font-size:12px;margin-top:6px;">

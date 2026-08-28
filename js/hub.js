@@ -6,8 +6,8 @@
 // fields fresh, so every viewer here gets true real-time updates with
 // zero CFBD calls of their own.
 // ============================================================
-import { db } from "./firebase-config.js";
-import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { db } from "./firebase-config.js?v=20260828h";
+import { collection, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const scoresEl = document.getElementById("live-scores");
 const flowEl = document.getElementById("money-flow");
@@ -16,10 +16,24 @@ let latestGames = [];
 let latestPicks = [];
 let latestBets = [];
 let latestResponses = [];
+let latestSyncSettings = null; // null = not loaded yet, show everything rather than hide games prematurely
 
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule + picks.js
 function isWithinLockWindow(game) {
   return game.kickoffMs && Date.now() >= (game.kickoffMs - LOCK_WINDOW_MS);
+}
+
+// Only show games that match what the commissioner currently has synced.
+// Games missing division/conference tags (synced before this feature, or
+// added manually) are always shown — no way to know if they'd match, and
+// hiding them by default would be a worse failure mode than showing an
+// occasional extra game.
+function matchesSyncScope(game) {
+  if (!latestSyncSettings) return true;
+  if (!game.division) return true;
+  if (!latestSyncSettings.divisions.includes(game.division)) return false;
+  if (latestSyncSettings.conferences.length && !latestSyncSettings.conferences.includes(game.conference)) return false;
+  return true;
 }
 
 // ---------- live scores ----------
@@ -30,14 +44,23 @@ export function renderLiveScores() {
       .sort((a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity));
     drawScores();
   });
+  onSnapshot(doc(db, "settings", "sync"), (snap) => {
+    latestSyncSettings = snap.exists()
+      ? { divisions: snap.data().divisions?.length ? snap.data().divisions : ["fbs"], conferences: snap.data().conferences || [] }
+      : { divisions: ["fbs"], conferences: [] };
+    drawScores();
+  }, (err) => {
+    console.warn("Couldn't load sync settings for hub filtering:", err);
+  });
 }
 
 function drawScores() {
-  if (!latestGames.length) {
+  const visibleGames = latestGames.filter(matchesSyncScope);
+  if (!visibleGames.length) {
     scoresEl.innerHTML = `<div class="empty-state">No games tracked yet — sync a week from the Standings page.</div>`;
     return;
   }
-  scoresEl.innerHTML = latestGames.map(g => {
+  scoresEl.innerHTML = visibleGames.map(g => {
     const statusLabel = g.liveStatus === "final" ? "FINAL"
       : g.liveStatus === "live" ? `Q${g.period ?? "?"} ${g.clock ?? ""}`
       : new Date(g.kickoffMs || 0).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });

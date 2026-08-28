@@ -3,14 +3,14 @@
 // transaction history, and commissioner tools: CFBD weekly sync,
 // manual matchup entry, game settlement, commissioner grants.
 // ============================================================
-import { db } from "./firebase-config.js";
+import { db } from "./firebase-config.js?v=20260828h";
 import {
   collection, addDoc, doc, updateDoc, onSnapshot, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, settleUp } from "./app.js";
-import { settleGame } from "./picks.js";
-import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js";
-import { COMMISSIONER_CODE } from "./firebase-config.js";
+import { currentUser, settleUp } from "./app.js?v=20260828h";
+import { settleGame } from "./picks.js?v=20260828h";
+import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js?v=20260828h";
+import { COMMISSIONER_CODE } from "./firebase-config.js?v=20260828h";
 
 const standingsEl = document.getElementById("standings");
 const historyEl = document.getElementById("history");
@@ -36,7 +36,7 @@ export function renderStandings() {
             currently ${bal < 0 ? "owes" : "is owed"} <strong style="color:${bal < 0 ? "#ff8a8a" : "#6fd39a"};">$${Math.abs(bal).toFixed(0)}</strong>
           </div>
         </div>
-        <div class="leaf-stickers">${"🍁".repeat(Math.min(p.leafStickers || 0, 12))}</div>
+        <div class="leaf-stickers">${"🌰".repeat(Math.min(p.leafStickers || 0, 12))}</div>
         <div style="text-align:right;">
           <div class="player-net ${allTimeNet >= 0 ? "pos" : "neg"}">${allTimeNet >= 0 ? "+" : ""}$${allTimeNet.toFixed(0)}</div>
           <div style="font-size:9px;color:var(--gray-light);font-family:'Inter';">all-time</div>
