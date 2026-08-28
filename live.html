@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Live Bets · The Shoe Pool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="leaf">🍁</span><h1>THE <span>SHOE</span> POOL</h1></div>
+    <div class="balance-chip" id="balance-chip">—</div>
+  </header>
+  <nav class="tabs">
+    <a href="index.html">Home</a>
+    <a href="picks.html">Weekly Picks</a>
+    <a href="live.html">Live Bets</a>
+    <a href="sidebets.html">Active Sidebets</a>
+    <a href="ledger.html">Standings</a>
+    <a href="offline.html">Offline Entry</a>
+    <a href="rules.html">Rules</a>
+  </nav>
+
+  <div class="shell">
+    <div class="card">
+      <h3>Propose a Bet</h3>
+      <form id="propose-form" style="display:grid;gap:10px;">
+        <input id="propose-desc" placeholder='e.g. "Next drive ends in a punt"' required />
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <label class="label" style="font-size:12px;">
+            <input type="radio" name="mode" value="even" checked /> 50/50
+          </label>
+          <label class="label" style="font-size:12px;">
+            <input type="radio" name="mode" value="odds" /> Odds-based
+          </label>
+          <input id="odds-input" type="number" step="0.1" placeholder="Odds (e.g. 3 = 3:1)" style="width:150px;display:none;" />
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <label class="label" style="font-size:12px;">
+            <input type="radio" name="scope" value="open" checked /> Open to anyone
+          </label>
+          <label class="label" style="font-size:12px;">
+            <input type="radio" name="scope" value="group" /> Challenge specific people
+          </label>
+        </div>
+        <div id="invite-players" style="display:flex;gap:12px;flex-wrap:wrap;"></div>
+        <input id="propose-wager" type="number" min="1" placeholder="Your wager $" required style="width:150px;" />
+        <button type="submit" class="small">Propose</button>
+      </form>
+    </div>
+
+    <div class="section-title">
+      <h2>Live Feed</h2>
+      <span class="sub">Updates instantly for everyone</span>
+    </div>
+    <div id="live-feed"></div>
+  </div>
+
+  <script type="module">
+    import { initAuth, highlightNav, currentUser, initNetworkStatus } from "./js/app.js";
+    import { loadRoster, proposeBet, renderFeed } from "./js/live.js";
+
+    highlightNav();
+    initNetworkStatus();
+    initAuth(() => { loadRoster(); renderFeed("live-feed"); });
+
+    document.querySelectorAll('input[name="mode"]').forEach(r =>
+      r.addEventListener("change", () => {
+        document.getElementById("odds-input").style.display =
+          document.querySelector('input[name="mode"]:checked').value === "odds" ? "block" : "none";
+      })
+    );
+
+    document.getElementById("propose-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const scope = document.querySelector('input[name="scope"]:checked').value;
+      const description = document.getElementById("propose-desc").value;
+      const odds = mode === "odds" ? parseFloat(document.getElementById("odds-input").value) : null;
+      const invited = scope === "group"
+        ? [...document.querySelectorAll('#invite-players input:checked')].map(i => ({ uid: i.value, name: i.dataset.name }))
+        : [];
+      await proposeBet({ gameId: null, description, mode, scope, odds, invited });
+      e.target.reset();
+    });
+  </script>
+</body>
+</html>

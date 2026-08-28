@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>House Rules · The Shoe Pool</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Oswald:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+<style>
+  .rules-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+  .rules-nav a { font-family: 'Oswald'; font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase;
+    background: var(--charcoal); border: 1px solid #2a2a2a; padding: 6px 12px; border-radius: 12px; color: var(--gray-light); }
+  .rules-nav a:hover { border-color: var(--scarlet); color: var(--bone); }
+  .rule-section h3 { color: var(--scarlet); margin-top: 0; }
+  .rule-section h4 { font-family: 'Oswald'; font-size: 14px; color: var(--buckeye-shine); margin: 16px 0 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .rule-section p, .rule-section li { font-size: 13px; line-height: 1.65; color: #d8d5cd; }
+  .rule-section ul { padding-left: 20px; margin: 6px 0; }
+  .formula {
+    background: var(--black); border: 1px solid #2a2a2a; border-radius: var(--radius);
+    padding: 10px 14px; font-family: 'Inter'; font-size: 12px; color: var(--buckeye-shine);
+    margin: 8px 0; overflow-x: auto; white-space: pre;
+  }
+  table.tier-table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 12px; }
+  table.tier-table th, table.tier-table td { border-bottom: 1px solid #2a2a2a; padding: 6px 8px; text-align: left; }
+  table.tier-table th { color: var(--gray-light); font-family: 'Oswald'; font-weight: 400; text-transform: uppercase; font-size: 10px; }
+  .example-box { border-left: 3px solid var(--buckeye); background: rgba(91,58,41,0.15); padding: 10px 14px; margin: 10px 0; border-radius: 0 var(--radius) var(--radius) 0; font-size: 12px; }
+</style>
+</head>
+<body>
+  <header class="top">
+    <div class="brand"><span class="leaf">🍁</span><h1>THE <span>SHOE</span> POOL</h1></div>
+    <div class="balance-chip" id="balance-chip">—</div>
+  </header>
+  <nav class="tabs">
+    <a href="index.html">Home</a>
+    <a href="picks.html">Weekly Picks</a>
+    <a href="live.html">Live Bets</a>
+    <a href="sidebets.html">Active Sidebets</a>
+    <a href="ledger.html">Standings</a>
+    <a href="offline.html">Offline Entry</a>
+    <a href="rules.html">Rules</a>
+  </nav>
+
+  <div class="shell">
+    <div class="section-title"><h2>House Rules</h2><span class="sub">Everything, in one place</span></div>
+
+    <div class="rules-nav">
+      <a href="#weekly-picks">Weekly Picks</a>
+      <a href="#scoring">Payout Tiers</a>
+      <a href="#lines">Line Locking</a>
+      <a href="#live-bets">Live Bets</a>
+      <a href="#odds">In-Game Odds</a>
+      <a href="#leaderboard">Leaderboard</a>
+      <a href="#offline">Offline Mode</a>
+      <a href="#accounts">Accounts</a>
+    </div>
+
+    <div id="weekly-picks" class="card rule-section">
+      <h3>1. Weekly Picks</h3>
+      <p>Every synced matchup gets a point spread. Pick a side and put money on it — everyone's wagers for that
+        game go into one shared pot for that matchup only.</p>
+      <h4>Placing, changing, and cancelling a pick</h4>
+      <ul>
+        <li>You can place one pick per game.</li>
+        <li>You can change your side or your wager amount, or cancel entirely for a full refund, <strong>anytime before kickoff</strong>.</li>
+        <li>The instant the game starts, your pick is frozen — no exceptions, and this is enforced by the database
+          itself, not just the app's buttons, so it can't be worked around.</li>
+      </ul>
+      <h4>Against the spread (ATS)</h4>
+      <p>You're betting whether your team beats the spread, not just whether they win. A team that's +7 only needs
+        to lose by 6 or fewer (or win outright) to "cover." A team that's -7 needs to win by more than 7.</p>
+    </div>
+
+    <div id="scoring" class="card rule-section">
+      <h3>2. How Payouts Are Calculated</h3>
+      <p>Weekly picks don't pay flat odds — how much you win depends on <em>how emphatically</em> you were right.
+        A squeaker cover pays less than a backdoor blowout, and correctly calling an outright upset pays the most
+        of all.</p>
+
+      <h4>Step 1 — Which tier</h4>
+      <table class="tier-table">
+        <tr><th>Tier</th><th>Condition</th><th>Base multiplier</th></tr>
+        <tr><td>1</td><td>Underdog covers, loses outright</td><td>1.0x</td></tr>
+        <tr><td>2</td><td>Underdog covers <strong>and</strong> wins outright</td><td>2.0x</td></tr>
+        <tr><td>3</td><td>Favorite covers and wins</td><td>1.0x</td></tr>
+        <tr><td>4</td><td>Favorite wins but fails to cover</td><td>this is a loss — 0x</td></tr>
+      </table>
+
+      <h4>Step 2 — Scale by margin</h4>
+      <p>Within whichever tier you land in, the payout scales up the further you beat the spread by:</p>
+      <div class="formula">cover_margin = your team's actual margin − the spread they needed to beat
+scaling = 1 + (cover_margin / |spread|), capped at 3.0x
+final_multiplier = tier_base × scaling</div>
+
+      <h4>Step 3 — Split the pot</h4>
+      <p>Every winning pick gets weighted by <code>wager × final_multiplier</code>. The whole pot (minus any pushes,
+        which are refunded in full) is split among winners proportional to their weighted stake:</p>
+      <div class="formula">your payout = pot × (your weighted stake / sum of all winning weighted stakes)</div>
+
+      <div class="example-box">
+        <strong>Example:</strong> You take a +7 underdog for $20. They win outright by 3 — that's Tier 2 (base 2.0x).
+        Cover margin = 7 + 3 = 10, scaling = 1 + (10/7) = 2.43x, so your final multiplier is 2.0 × 2.43 ≈ 4.86x.
+        Your weighted stake is $20 × 4.86 ≈ $97 — you're now competing for a much bigger slice of the pot than
+        someone who just barely covered with the favorite.
+      </div>
+
+      <h4>Pushes</h4>
+      <p>If the actual margin lands exactly on the spread, that's a push — full refund, no multiplier, doesn't
+        touch the pot split for anyone else.</p>
+
+      <h4>Buckeye leaf stickers 🍁</h4>
+      <p>Land a multiplier of 2.0x or higher (i.e. you called a real upset, not just a cover) and you earn a leaf
+        sticker, shown next to your name on the Standings page. Purely bragging rights.</p>
+    </div>
+
+    <div id="lines" class="card rule-section">
+      <h3>3. Line Locking</h3>
+      <p>The point spread for weekly picks moves with the market right up until <strong>24 hours before kickoff</strong>,
+        at which point it locks permanently. This mirrors a real sportsbook's opening line vs. closing line — you're
+        never picking against a number that quietly moved on you after you locked in.</p>
+      <ul>
+        <li>Before the 24-hour window: the spread can shift as new lines come in.</li>
+        <li>Inside the 24-hour window: whatever the line is gets frozen and never changes again, even if the
+          commissioner re-syncs that week for other reasons.</li>
+        <li>You can still place, change, or cancel your <em>pick</em> right up until kickoff — it's only the number
+          itself (the spread) that locks 24 hours early, not your ability to act on it.</li>
+      </ul>
+    </div>
+
+    <div id="live-bets" class="card rule-section">
+      <h3>4. Live In-Game Bets</h3>
+      <p>Once a game's underway, anyone can propose a side bet on anything happening in it — "next drive ends in a
+        punt," "they score before the 2-minute warning," whatever. Every bet has two independent settings:</p>
+
+      <h4>Who it's against</h4>
+      <ul>
+        <li><strong>Open pool</strong> — anyone in the group can join either side, no invite needed.</li>
+        <li><strong>Group challenge</strong> — you pick specific people; each one has to individually accept or
+          decline before it counts. Declining or ignoring it doesn't block anyone else in the group from accepting.</li>
+      </ul>
+
+      <h4>How it pays out</h4>
+      <ul>
+        <li><strong>50/50 (even money)</strong> — no odds to set. Everyone's stakes go into one pot, winners split
+          it proportional to how much they put in. Fully self-balancing — you can never pay out more than what was
+          actually wagered.</li>
+        <li><strong>Odds-based</strong> — the proposer sets odds (e.g. 3:1) and is effectively the house for that
+          bet, taking the other side of everyone who accepts.</li>
+      </ul>
+
+      <h4>Resolving a bet</h4>
+      <p>The commissioner marks the outcome once it's known (proposer's side won, or the field won), and payouts run
+        automatically. Bets can only be resolved while they're still open.</p>
+    </div>
+
+    <div id="odds" class="card rule-section">
+      <h3>5. In-Game Odds Can Move — Fairly</h3>
+      <p>Unlike the weekly spread, live bet odds are <strong>never locked</strong> — the proposer can move the
+        posted number at any point while the bet is still open, the same way a sportsbook line drifts during a game.</p>
+      <p>But moving the line never rewrites a deal someone already made: the moment you accept an odds-based bet,
+        whatever number was posted <em>right then</em> gets frozen onto your own bet, permanently. If the proposer
+        moves the odds afterward, it only affects people who join <em>after</em> that point.</p>
+      <div class="example-box">
+        <strong>Example:</strong> A bet is posted at 3:1. Spencer accepts — he's locked at 3:1 no matter what happens
+        next. The proposer then moves the line to 2:1 because the situation's shifted. Joey accepts after that —
+        he's locked at 2:1. When the bet resolves, Spencer gets paid at 3:1 and Joey at 2:1, even though it's the
+        same bet.
+      </div>
+      <p>The weekly pick spread and live bet odds are completely separate systems on purpose — the spread is the one
+        number every pregame pick settles against, so it has to stop moving 24 hours out. Live odds are a
+        conversation happening in real time during the game, so they stay fluid until the bet is settled.</p>
+    </div>
+
+    <div id="leaderboard" class="card rule-section">
+      <h3>6. Standings & Leaderboard</h3>
+      <p>Everyone starts with the same balance. The Standings page ranks the group by <strong>net dollars won or
+        lost, all-time</strong> — not your current balance, so it stays a fair comparison even if someone's been
+        playing longer or wagering bigger.</p>
+      <p>Your personal transaction history is on the same page, showing every wager, refund, and payout individually.</p>
+    </div>
+
+    <div id="offline" class="card rule-section">
+      <h3>7. Offline Mode</h3>
+      <p>If the commissioner is somewhere without signal — tailgate, stadium, dead zone — they can still log bets and
+        outcomes by hand from the Offline Entry page. Those entries save locally on their device and sync
+        automatically the moment it reconnects. No one else can see or act on them until that sync happens.</p>
+      <p>One trade-off: offline entries skip the normal "can this person actually afford this" check, since that
+        check needs a live connection. The commissioner is trusted to get the numbers right when working offline.</p>
+    </div>
+
+    <div id="accounts" class="card rule-section">
+      <h3>8. Accounts & Commissioner Access</h3>
+      <ul>
+        <li>Everyone logs in with a name and password — real accounts, so you can log in from any device.</li>
+        <li>Commissioner powers (syncing games, settling bets, resolving live bets, offline entry) require the
+          commissioner code, entered at signup or unlocked later from the Standings page.</li>
+        <li>Ask whoever set up the pool if you need the code.</li>
+      </ul>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initAuth, highlightNav, initNetworkStatus } from "./js/app.js";
+    highlightNav();
+    initNetworkStatus();
+    initAuth();
+  </script>
+</body>
+</html>
