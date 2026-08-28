@@ -199,14 +199,18 @@ async function settleGame(gameId, homeScore, awayScore) {
     const teamSpread = pickedHome ? -spread : spread;
     const coverMargin = teamMargin + teamSpread;
     if (coverMargin === 0) return { ...p, result: "push", payout: p.wagerAmount, weighted: 0 };
-    if (coverMargin < 0) return { ...p, result: "loss", payout: 0, weighted: 0 };
+
     const wonOutright = teamMargin > 0;
+
+    if (coverMargin < 0) {
+      // Missed the cover. Still won outright (only possible for a
+      // favorite) = Tier 4, flat 0.5x. Genuinely lost outright = 0x.
+      if (wonOutright) return { ...p, result: "win", multiplier: 0.5, weighted: p.wagerAmount * 0.5 };
+      return { ...p, result: "loss", payout: 0, weighted: 0 };
+    }
+
     const isDog = teamSpread > 0;
-    let base;
-    if (isDog && wonOutright) base = 2.0;
-    else if (isDog && !wonOutright) base = 1.0;
-    else if (!isDog && wonOutright) base = 1.0;
-    else base = 0.5;
+    const base = (isDog && wonOutright) ? 2.0 : 1.0;
     const spreadAbs = Math.abs(teamSpread) || 1;
     const scale = Math.min(1 + coverMargin / spreadAbs, 3.0);
     return { ...p, result: "win", multiplier: base * scale, weighted: p.wagerAmount * base * scale };

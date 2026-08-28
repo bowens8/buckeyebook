@@ -69,6 +69,15 @@ service cloud.firestore {
       allow update: if isSignedIn() && resource.data.playerId == request.auth.uid;
     }
 
+    // Sync settings (which divisions/conferences to pull) — readable by
+    // any signed-in user, since the auto-sync engine running on ANY
+    // device needs to read this to know what to pull. Only the
+    // commissioner can change it.
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isCommissioner();
+    }
+
     // Ledger entries are an append-only audit trail.
     match /ledger/{entryId} {
       allow read: if isSignedIn() && resource.data.playerId == request.auth.uid;

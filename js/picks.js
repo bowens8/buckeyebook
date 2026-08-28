@@ -204,15 +204,23 @@ export async function settleGame(gameId, homeScore, awayScore) {
     const coverMargin = teamMargin + teamSpread; // >0 = covered, 0 = push, <0 = missed
 
     if (coverMargin === 0) return { ...p, result: "push", payout: p.wagerAmount, weighted: 0 };
-    if (coverMargin < 0) return { ...p, result: "loss", payout: 0, weighted: 0 };
 
     const wonOutright = teamMargin > 0;
+
+    if (coverMargin < 0) {
+      // Missed the cover. If the pick's team still won the game outright
+      // (only possible for a favorite — an underdog that wins always
+      // covers by definition), that's Tier 4: partial credit at a flat
+      // 0.5x rather than a total loss. Genuinely lost outright = 0x.
+      if (wonOutright) {
+        return { ...p, result: "win", multiplier: 0.5, weighted: p.wagerAmount * 0.5 };
+      }
+      return { ...p, result: "loss", payout: 0, weighted: 0 };
+    }
+
+    // Covered the spread — tiers 1-3.
     const isDog = teamSpread > 0;
-    let base;
-    if (isDog && wonOutright) base = 2.0;
-    else if (isDog && !wonOutright) base = 1.0;
-    else if (!isDog && wonOutright) base = 1.0;
-    else base = 0.5; // favorite, no outright win possible if covered... (favorite always wins if covering, so unused in practice)
+    const base = (isDog && wonOutright) ? 2.0 : 1.0; // dog-covers-and-wins, or any other cover (dog surviving, or favorite covering — which always means winning outright)
 
     const spreadAbs = Math.abs(teamSpread) || 1;
     const scale = Math.min(1 + coverMargin / spreadAbs, 3.0);

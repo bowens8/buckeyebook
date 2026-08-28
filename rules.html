@@ -87,14 +87,16 @@
         <tr><td>1</td><td>Underdog covers, loses outright</td><td>1.0x</td></tr>
         <tr><td>2</td><td>Underdog covers <strong>and</strong> wins outright</td><td>2.0x</td></tr>
         <tr><td>3</td><td>Favorite covers and wins</td><td>1.0x</td></tr>
-        <tr><td>4</td><td>Favorite wins but fails to cover</td><td>this is a loss — 0x</td></tr>
+        <tr><td>4</td><td>Favorite wins but fails to cover</td><td>0.5x flat (no margin scaling)</td></tr>
       </table>
 
       <h4>Step 2 — Scale by margin</h4>
-      <p>Within whichever tier you land in, the payout scales up the further you beat the spread by:</p>
+      <p>Within tiers 1-3, the payout scales up the further you beat the spread by:</p>
       <div class="formula">cover_margin = your team's actual margin − the spread they needed to beat
 scaling = 1 + (cover_margin / |spread|), capped at 3.0x
 final_multiplier = tier_base × scaling</div>
+      <p style="font-size:12px;">Tier 4 is the one exception — since you didn't actually cover, there's no
+        positive margin to scale by, so it's always a flat 0.5x regardless of how close or far the miss was.</p>
 
       <h4>Step 3 — Split the pot</h4>
       <p>Every winning pick gets weighted by <code>wager × final_multiplier</code>. The whole pot (minus any pushes,

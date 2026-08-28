@@ -5,7 +5,7 @@
 // Commissioner-only action, triggered from ledger.html.
 // ============================================================
 import { db, CFBD_API_KEY } from "./firebase-config.js";
-import { doc, setDoc, getDocs, collection, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { doc, getDoc, setDoc, getDocs, collection, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const BASE = "https://api.collegefootballdata.com";
 
@@ -17,13 +17,54 @@ async function cfbdGet(path) {
   return res.json();
 }
 
+// ---------- commissioner-controlled sync scope ----------
+// Which divisions (and optionally specific conferences within them) get
+// pulled in, both by the manual sync button and the auto-discovery
+// engine. Defaults to FBS/all-conferences if nothing's been configured.
+export async function getSyncSettings() {
+  const snap = await getDoc(doc(db, "settings", "sync"));
+  if (!snap.exists()) return { divisions: ["fbs"], conferences: [] };
+  const d = snap.data();
+  return {
+    divisions: d.divisions?.length ? d.divisions : ["fbs"],
+    conferences: d.conferences || [] // empty = no conference filter within the chosen division(s)
+  };
+}
+
+export async function saveSyncSettings(divisions, conferences) {
+  await setDoc(doc(db, "settings", "sync"), { divisions, conferences, updatedAt: serverTimestamp() });
+}
+
+// Builds the division/conference query-string combos to fetch. Multiple
+// divisions and/or conferences mean multiple CFBD calls merged together,
+// since the API only accepts one of each per request.
+function buildScopeCombos({ divisions, conferences }) {
+  const divs = divisions.length ? divisions : ["fbs"];
+  if (!conferences.length) return divs.map(division => ({ division, conference: null }));
+  return divs.flatMap(division => conferences.map(conference => ({ division, conference })));
+}
+
 // year/week: numbers, e.g. syncWeek(2026, 5)
 export async function syncWeek(year, week, seasonType = "regular") {
-  const [games, lines, existingSnap] = await Promise.all([
-    cfbdGet(`/games?year=${year}&week=${week}&seasonType=${seasonType}&division=fbs`),
-    cfbdGet(`/lines?year=${year}&week=${week}&seasonType=${seasonType}`),
+  const settings = await getSyncSettings();
+  const combos = buildScopeCombos(settings);
+
+  const [gameResults, lineResults, existingSnap] = await Promise.all([
+    Promise.all(combos.map(c => cfbdGet(
+      `/games?year=${year}&week=${week}&seasonType=${seasonType}&division=${c.division}${c.conference ? `&conference=${c.conference}` : ""}`
+    ))),
+    Promise.all(combos.map(c => cfbdGet(
+      `/lines?year=${year}&week=${week}&seasonType=${seasonType}${c.conference ? `&conference=${c.conference}` : ""}`
+    ))),
     getDocs(query(collection(db, "games"), where("year", "==", year), where("week", "==", week)))
   ]);
+
+  // Merge + de-dupe by game id, since overlapping combos (e.g. two
+  // conferences within the same division call) can return the same game.
+  const gameById = new Map();
+  gameResults.flat().forEach(g => gameById.set(g.id, g));
+  const games = [...gameById.values()];
+  const lines = lineResults.flat();
 
   // Once the background engine has locked a line, a manual re-sync must
   // never overwrite it — otherwise "the odds lock 48h out" would be a lie
@@ -122,6 +163,12 @@ export async function fetchLines(trackedGames) {
 // Groups tracked games by year/week so a poll of many games only costs
 // one API call per distinct week. Returns a map keyed by cfbdId. Used
 // by live-data-engine.js for continuous score refresh.
+//
+// Deliberately doesn't filter by division here — it just pulls every
+// game for that year/week/seasonType and looks up scores by cfbdId, so
+// whatever divisions the commissioner chose to sync (see syncWeek) all
+// get their scores refreshed correctly without this needing to know
+// the sync settings itself.
 export async function fetchLiveScores(trackedGames) {
   const byWeek = {};
   trackedGames.forEach(g => {
@@ -133,7 +180,7 @@ export async function fetchLiveScores(trackedGames) {
   const scoreMap = {};
   await Promise.all(Object.entries(byWeek).map(async ([key, groupGames]) => {
     const [year, week, seasonType] = key.split("-");
-    const games = await cfbdGet(`/games?year=${year}&week=${week}&seasonType=${seasonType}&division=fbs`);
+    const games = await cfbdGet(`/games?year=${year}&week=${week}&seasonType=${seasonType}`);
     games.forEach(g => {
       scoreMap[g.id] = {
         homePoints: g.homePoints, awayPoints: g.awayPoints,
