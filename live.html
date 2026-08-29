@@ -27,8 +27,12 @@
     <div class="card">
       <h3>Propose a Bet</h3>
       <form id="propose-form" style="display:grid;gap:10px;">
+        <div>
+          <label class="label" style="font-size:11px;color:var(--gray-light);display:block;margin-bottom:4px;">Which game is this about? (optional, but needed for live odds suggestions)</label>
+          <select id="propose-game" style="width:100%;"></select>
+        </div>
         <input id="propose-desc" placeholder='e.g. "Next drive ends in a punt"' required />
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
           <label class="label" style="font-size:12px;">
             <input type="radio" name="mode" value="even" checked /> 50/50
           </label>
@@ -36,7 +40,9 @@
             <input type="radio" name="mode" value="odds" /> Odds-based
           </label>
           <input id="odds-input" type="number" step="0.1" placeholder="Odds (e.g. 3 = 3:1)" style="width:150px;display:none;" />
+          <button type="button" id="use-live-odds-btn" class="small ghost" style="display:none;">Use Live Odds</button>
         </div>
+        <p id="live-odds-note" style="font-size:11px;color:var(--gray-light);display:none;margin:0;"></p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <label class="label" style="font-size:12px;">
             <input type="radio" name="scope" value="open" checked /> Open to anyone
@@ -59,31 +65,48 @@
   </div>
 
   <script type="module">
-    import { initAuth, highlightNav, currentUser, initNetworkStatus } from "./js/app.js?v=20260828q";
-    import { loadRoster, proposeBet, renderFeed } from "./js/live.js?v=20260828q";
+    import { initAuth, highlightNav, currentUser, initNetworkStatus } from "./js/app.js?v=20260828u";
+    import { loadRoster, proposeBet, renderFeed, loadGamesForBetting, getGameForBetting, computeLiveOdds } from "./js/live.js?v=20260828u";
 
     highlightNav();
     initNetworkStatus();
-    initAuth(() => { loadRoster(); renderFeed("live-feed"); });
+    initAuth(() => { loadRoster(); loadGamesForBetting(); renderFeed("live-feed"); });
 
     document.querySelectorAll('input[name="mode"]').forEach(r =>
       r.addEventListener("change", () => {
-        document.getElementById("odds-input").style.display =
-          document.querySelector('input[name="mode"]:checked').value === "odds" ? "block" : "none";
+        const isOdds = document.querySelector('input[name="mode"]:checked').value === "odds";
+        document.getElementById("odds-input").style.display = isOdds ? "block" : "none";
+        document.getElementById("use-live-odds-btn").style.display = isOdds ? "block" : "none";
       })
     );
+
+    document.getElementById("use-live-odds-btn").addEventListener("click", () => {
+      const gameId = document.getElementById("propose-game").value;
+      const noteEl = document.getElementById("live-odds-note");
+      if (!gameId) { toast("Pick a game above first."); return; }
+      const game = getGameForBetting(gameId);
+      if (!game) { toast("Couldn't find that game's data."); return; }
+      const { homeWinProb, awayWinProb, favoredIsHome, fairUnderdogOdds } = computeLiveOdds(game);
+      document.getElementById("odds-input").value = fairUnderdogOdds;
+      const favored = favoredIsHome ? game.homeTeam : game.awayTeam;
+      const underdog = favoredIsHome ? game.awayTeam : game.homeTeam;
+      noteEl.style.display = "block";
+      noteEl.textContent = `Estimate from current score/time only (${favored} ${Math.round(Math.max(homeWinProb, awayWinProb) * 100)}% · ${underdog} ${Math.round(Math.min(homeWinProb, awayWinProb) * 100)}%) — not a real market line. Filled in ${fairUnderdogOdds}:1 for backing ${underdog}; adjust as needed.`;
+    });
 
     document.getElementById("propose-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       const mode = document.querySelector('input[name="mode"]:checked').value;
       const scope = document.querySelector('input[name="scope"]:checked').value;
       const description = document.getElementById("propose-desc").value;
+      const gameId = document.getElementById("propose-game").value || null;
       const odds = mode === "odds" ? parseFloat(document.getElementById("odds-input").value) : null;
       const invited = scope === "group"
         ? [...document.querySelectorAll('#invite-players input:checked')].map(i => ({ uid: i.value, name: i.dataset.name }))
         : [];
-      await proposeBet({ gameId: null, description, mode, scope, odds, invited });
+      await proposeBet({ gameId, description, mode, scope, odds, invited });
       e.target.reset();
+      document.getElementById("live-odds-note").style.display = "none";
     });
   </script>
 </body>

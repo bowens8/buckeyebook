@@ -114,6 +114,11 @@ final_multiplier = tier_base × scaling</div>
       <p>If the actual margin lands exactly on the spread, that's a push — full refund, no multiplier, doesn't
         touch the pot split for anyone else.</p>
 
+      <h4>Both sides required</h4>
+      <p>A pick only actually counts if someone takes the other side. If every single pick on a game ends up on
+        the same team — nobody picked the opponent — the whole thing voids and everyone gets a full refund, no
+        multiplier applied. There's no real wager happening without a counterparty on the other end of it.</p>
+
       <h4>Buckeye stickers 🌰</h4>
       <p>Land a multiplier of 2.0x or higher (i.e. you called a real upset, not just a cover) and you earn a leaf
         sticker, shown next to your name on the Standings page. Purely bragging rights.</p>
@@ -220,7 +225,7 @@ final_multiplier = tier_base × scaling</div>
   </div>
 
   <script type="module">
-    import { initAuth, highlightNav, initNetworkStatus } from "./js/app.js?v=20260828q";
+    import { initAuth, highlightNav, initNetworkStatus } from "./js/app.js?v=20260828u";
     highlightNav();
     initNetworkStatus();
     initAuth();

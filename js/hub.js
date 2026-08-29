@@ -6,7 +6,7 @@
 // fields fresh, so every viewer here gets true real-time updates with
 // zero CFBD calls of their own.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828q";
+import { db } from "./firebase-config.js?v=20260828u";
 import { collection, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const scoresEl = document.getElementById("live-scores");
@@ -124,20 +124,31 @@ function drawFlow() {
     return;
   }
 
-  // Pot per weekly pick game
+  // Pot per weekly pick game, plus who's actually on it and which side.
   const gamePots = latestGames.map(g => {
-    const pot = latestPicks.filter(p => p.gameId === g.id).reduce((s, p) => s + p.wagerAmount, 0);
-    return { label: `${g.awayTeam} @ ${g.homeTeam}`, amount: pot };
+    const picks = latestPicks.filter(p => p.gameId === g.id);
+    const pot = picks.reduce((s, p) => s + p.wagerAmount, 0);
+    const contributors = picks.map(p => ({
+      name: p.playerName,
+      amount: p.wagerAmount,
+      side: p.side === "home" ? g.homeTeam : g.awayTeam
+    }));
+    return { label: `${g.awayTeam} @ ${g.homeTeam}`, amount: pot, contributors };
   }).filter(x => x.amount > 0);
 
-  // Pot per open/live side bet
+  // Pot per open/live side bet, plus who's on it.
   const betPots = latestBets.filter(b => b.status !== "settled" || true).map(b => {
-    const responseTotal = latestResponses.filter(r => r.betId === b.id && r.response === "accepted")
-      .reduce((s, r) => s + (r.wagerAmount || 0), 0);
+    const accepted = latestResponses.filter(r => r.betId === b.id && r.response === "accepted");
+    const responseTotal = accepted.reduce((s, r) => s + (r.wagerAmount || 0), 0);
+    const contributors = [
+      { name: b.proposerName, amount: b.proposerWager || 0, side: "proposer" },
+      ...accepted.map(r => ({ name: r.playerName, amount: r.wagerAmount || 0, side: r.side || "field" }))
+    ];
     return {
       label: b.description,
       amount: (b.proposerWager || 0) + responseTotal,
-      settled: b.status === "settled"
+      settled: b.status === "settled",
+      contributors
     };
   }).filter(x => x.amount > 0);
 
@@ -147,13 +158,19 @@ function drawFlow() {
   const max = Math.max(...all.map(x => x.amount), 1);
   const total = all.reduce((s, x) => s + x.amount, 0);
 
+  const contributorLine = (contributors) => {
+    if (!contributors.length) return "";
+    const text = contributors.map(c => `${c.name} $${c.amount}${c.side ? ` (${c.side})` : ""}`).join(" · ");
+    return `<div style="font-size:10px;color:var(--gray-light);margin-top:2px;">${text}</div>`;
+  };
+
   flowEl.innerHTML = `
     <div style="font-family:'Anton';font-size:28px;color:var(--buckeye-shine);margin-bottom:14px;">
       $${total.toFixed(0)} <span style="font-family:'Oswald';font-size:12px;color:var(--gray-light);">total in play</span>
     </div>
     ${all.map(x => `
       <div class="money-row">
-        <div class="money-label">${x.label} <span class="money-type">${x.type}</span></div>
+        <div class="money-label">${x.label} <span class="money-type">${x.type}</span>${contributorLine(x.contributors)}</div>
         <div class="money-bar-track"><div class="money-bar-fill" style="width:${(x.amount / max) * 100}%"></div></div>
         <div class="money-amt">$${x.amount.toFixed(0)}</div>
       </div>

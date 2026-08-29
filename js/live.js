@@ -4,14 +4,71 @@
 // document, so players accept/decline independently in parallel
 // with zero write contention on the parent bet doc.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828q";
+import { db } from "./firebase-config.js?v=20260828u";
 import {
   collection, doc, addDoc, getDocs, getDoc, onSnapshot, query, where,
   serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance } from "./app.js?v=20260828q";
+import { currentUser, debitBalance, creditBalance } from "./app.js?v=20260828u";
 
 const playerPickerEl = document.getElementById("invite-players");
+
+// ---------- live win-probability estimate ----------
+// There's no free real-time sportsbook feed to pull an actual line from,
+// so this is a transparent heuristic built from data we already have:
+// current score margin, scaled by how much of the game is left (more
+// time remaining = more uncertainty = odds move less per point of
+// current margin; less time left = the model swings harder on margin
+// alone). It's a genuine estimate, not a real market line — the
+// proposer can always override the pre-filled number.
+export function computeLiveOdds(game) {
+  const margin = (game.homeScore ?? 0) - (game.awayScore ?? 0); // positive = home leading
+  const period = game.period || 1;
+  const elapsedFraction = Math.min(Math.max((period - 1) / 4, 0), 0.95); // treats OT/period 5+ as ~95% elapsed
+  const remainingFactor = Math.sqrt(1 - elapsedFraction + 0.05); // more time left → wider spread of outcomes
+  const VOLATILITY = 7; // roughly "one score" in points — tunable, not scientifically calibrated
+  const homeWinProb = 1 / (1 + Math.exp(-margin / (VOLATILITY * remainingFactor)));
+  const awayWinProb = 1 - homeWinProb;
+  const underdogProb = Math.min(homeWinProb, awayWinProb);
+  const favoredIsHome = homeWinProb >= awayWinProb;
+  // Fair decimal-style odds for backing the trailing team, in this app's
+  // "odds:1" convention (payout = wager * (1 + odds)).
+  const fairUnderdogOdds = underdogProb > 0.02 ? Math.round(((1 - underdogProb) / underdogProb) * 10) / 10 : 49;
+  return { homeWinProb, awayWinProb, favoredIsHome, fairUnderdogOdds };
+}
+
+// ---------- load games for the "which game is this about" picker ----------
+// Cached in this module so the "Use Live Odds" button (and the feed's
+// game-name labels) can look up a game's data without a fresh read.
+// Always populates the lookup map; only touches the dropdown itself if
+// this page actually has one (live.html does, sidebets.html doesn't).
+let gamesForBetting = new Map();
+export function loadGamesForBetting() {
+  const selectEl = document.getElementById("propose-game");
+  onSnapshot(collection(db, "games"), (snap) => {
+    gamesForBetting = new Map(snap.docs.map(d => [d.id, { id: d.id, ...d.data() }]));
+    if (!selectEl) return;
+    const games = [...gamesForBetting.values()]
+      .filter(g => !g.hidden)
+      .sort((a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity));
+    const previousValue = selectEl.value;
+    selectEl.innerHTML = `<option value="">Not tied to a specific game</option>` + games.map(g => {
+      const isLive = g.liveStatus === "live" || (g.kickoffMs && Date.now() >= g.kickoffMs && g.liveStatus !== "final");
+      const label = `${g.awayTeam} @ ${g.homeTeam}${isLive ? ` (${g.awayScore ?? 0}-${g.homeScore ?? 0} live)` : ""}`;
+      return `<option value="${g.id}">${label}</option>`;
+    }).join("");
+    if (games.some(g => g.id === previousValue)) selectEl.value = previousValue;
+  });
+}
+
+export function getGameForBetting(gameId) {
+  return gamesForBetting.get(gameId) || null;
+}
+
+function gameLabel(gameId) {
+  const g = gamesForBetting.get(gameId);
+  return g ? `🏈 ${g.awayTeam} @ ${g.homeTeam}` : "🏈 Linked to a game";
+}
 
 // ---------- load roster for the invite picker ----------
 export async function loadRoster() {
@@ -229,6 +286,7 @@ export function renderBetItem(bet, responses) {
 
   div.innerHTML = `
     <div><strong>${bet.proposerName}</strong> proposed: "${bet.description}"</div>
+    ${bet.gameId ? `<div class="meta" style="font-size:11px;">${gameLabel(bet.gameId)}</div>` : ""}
     <div class="meta">
       ${bet.mode === "odds" ? `Odds: ${bet.odds}:1 ${bet.status === "open" ? '<span class="pill">line can still move</span>' : ""}` : "Even money"} ·
       ${bet.scope === "group" ? "Group challenge" : "Open pool"} ·

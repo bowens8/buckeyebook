@@ -38,12 +38,13 @@
   </div>
 
   <script type="module">
-    import { initAuth, highlightNav, initNetworkStatus, currentUser } from "./js/app.js?v=20260828q";
-    import { renderFeed } from "./js/live.js?v=20260828q";
+    import { initAuth, highlightNav, initNetworkStatus, currentUser } from "./js/app.js?v=20260828u";
+    import { renderFeed, loadGamesForBetting } from "./js/live.js?v=20260828u";
 
     highlightNav();
     initNetworkStatus();
     initAuth(() => {
+      loadGamesForBetting(); // populates the game-name lookup used when a bet is linked to a specific game
       // Bets where I'm invited and haven't responded yet.
       renderFeed("feed-pending", (bet, responses) =>
         bet.status === "open" &&

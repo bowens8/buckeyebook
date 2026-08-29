@@ -191,6 +191,18 @@ async function settleGame(gameId, homeScore, awayScore) {
 
   const picks = picksSnap.docs.map(d => ({ ref: d.ref, ...d.data() })).filter(p => !p.settled);
   if (!picks.length) return;
+
+  // A pick only "takes effect" if someone took the other side — void
+  // and refund everyone if this game's picks are all on one team.
+  const sidesPresent = new Set(picks.map(p => p.side));
+  if (sidesPresent.size < 2) {
+    for (const p of picks) {
+      await creditBalance(p.playerId, p.wagerAmount, "pick_void_no_opponent", gameId);
+      await p.ref.update({ settled: true, result: "void", payout: p.wagerAmount });
+    }
+    return;
+  }
+
   const pot = picks.reduce((s, p) => s + p.wagerAmount, 0);
 
   const scored = picks.map(p => {

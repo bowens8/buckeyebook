@@ -30,22 +30,22 @@
       <div class="cell"><div class="num" id="stat-pot">-</div><div class="lbl">$ In Play</div></div>
     </div>
 
-    <div class="section-title"><h2>Live Scores</h2><span class="sub">Refreshes every 45s</span></div>
-    <div class="card">
-      <div class="scores-strip" id="live-scores"></div>
-    </div>
-
     <div class="section-title"><h2>Where the Money's Going</h2><span class="sub">Weekly pots + active sidebets, real-time</span></div>
     <div class="card">
       <div id="money-flow"></div>
     </div>
+
+    <div class="section-title"><h2>Live Scores</h2><span class="sub">Real-time</span></div>
+    <div class="card">
+      <div class="scores-strip" id="live-scores"></div>
+    </div>
   </div>
 
   <script type="module">
-    import { db } from "./js/firebase-config.js?v=20260828q";
+    import { db } from "./js/firebase-config.js?v=20260828u";
     import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-    import { initAuth, highlightNav, initNetworkStatus } from "./js/app.js?v=20260828q";
-    import { renderLiveScores, renderMoneyFlow } from "./js/hub.js?v=20260828q";
+    import { initAuth, highlightNav, initNetworkStatus } from "./js/app.js?v=20260828u";
+    import { renderLiveScores, renderMoneyFlow } from "./js/hub.js?v=20260828u";
 
     highlightNav();
     initNetworkStatus();

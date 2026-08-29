@@ -3,12 +3,12 @@
 // Each player's action (placing a pick) is its own transaction,
 // so simultaneous picks from different players never collide.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828q";
+import { db } from "./firebase-config.js?v=20260828u";
 import {
   collection, doc, addDoc, onSnapshot, query, where,
   serverTimestamp, runTransaction, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828q";
+import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828u";
 
 const gamesEl = document.getElementById("games-list");
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule
@@ -287,8 +287,14 @@ function renderPickForm(game, existingPick = null) {
 }
 
 function renderMyPick(pick, game, locked) {
-  const tagClass = pick.settled ? (pick.result === "push" ? "push" : pick.payout > 0 ? "win" : "loss") : "pending";
-  const tagText = pick.settled ? (pick.result === "push" ? "PUSH" : pick.payout > 0 ? `WON $${pick.payout.toFixed(0)}` : "LOST") : "PENDING";
+  const tagClass = !pick.settled ? "pending"
+    : pick.result === "push" ? "push"
+    : pick.result === "void" ? "push"
+    : pick.payout > 0 ? "win" : "loss";
+  const tagText = !pick.settled ? "PENDING"
+    : pick.result === "push" ? "PUSH"
+    : pick.result === "void" ? "VOID — refunded (nobody picked the other side)"
+    : pick.payout > 0 ? `WON $${pick.payout.toFixed(0)}` : "LOST";
   return `
     <div class="my-pick-holder" style="margin-top:10px;font-size:13px;">
       You picked <strong>${pick.side === "home" ? game.homeTeam : game.awayTeam}</strong> for $${pick.wagerAmount}
@@ -384,6 +390,21 @@ export async function settleGame(gameId, homeScore, awayScore) {
     console.warn(`settleGame(${gameId}) called with nothing left to settle — skipping.`);
     return;
   }
+
+  // A pick only ever "takes effect" if someone actually took the other
+  // side — without a counterparty, there's no real wager happening, just
+  // money sitting in a pot with nobody on the other end of it. If
+  // everyone who picked this game picked the same team, void the whole
+  // thing and refund every wager rather than settling it.
+  const sidesPresent = new Set(picks.map(p => p.side));
+  if (sidesPresent.size < 2) {
+    for (const p of picks) {
+      await creditBalance(p.playerId, p.wagerAmount, "pick_void_no_opponent", gameId);
+      await updatePickResult(p.ref, "void", p.wagerAmount);
+    }
+    return;
+  }
+
   const pot = picks.reduce((s, p) => s + p.wagerAmount, 0);
 
   const scored = picks.map(p => {
