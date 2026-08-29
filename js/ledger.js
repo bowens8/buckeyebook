@@ -3,14 +3,14 @@
 // transaction history, and commissioner tools: CFBD weekly sync,
 // manual matchup entry, game settlement, commissioner grants.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828i";
+import { db } from "./firebase-config.js?v=20260828j";
 import {
   collection, addDoc, doc, updateDoc, onSnapshot, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, settleUp } from "./app.js?v=20260828i";
-import { settleGame } from "./picks.js?v=20260828i";
-import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js?v=20260828i";
-import { COMMISSIONER_CODE } from "./firebase-config.js?v=20260828i";
+import { currentUser, settleUp } from "./app.js?v=20260828j";
+import { settleGame } from "./picks.js?v=20260828j";
+import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js?v=20260828j";
+import { COMMISSIONER_CODE } from "./firebase-config.js?v=20260828j";
 
 const standingsEl = document.getElementById("standings");
 const historyEl = document.getElementById("history");
@@ -154,7 +154,11 @@ export async function renderCommishTools() {
     </form>
     <p id="scope-status" style="font-size:12px;color:var(--gray-light);margin-top:6px;"></p>
 
-    <h4 style="font-family:'Oswald';font-size:13px;color:var(--buckeye-shine);margin-top:20px;">Sync This Week from CFBD (manual backup)</h4>
+    <h4 style="font-family:'Oswald';font-size:13px;color:var(--buckeye-shine);margin-top:20px;">Show/Hide Specific Games</h4>
+    <p style="font-size:11px;color:var(--gray-light);">Beyond the division/conference filter above, uncheck any individual game to hide it from Weekly Picks and the Home hub entirely — it stays in the database, just out of sight everywhere players look.</p>
+    <div id="game-visibility-list" style="max-height:260px;overflow-y:auto;border:1px solid #2a2a2a;border-radius:var(--radius);padding:8px;"></div>
+
+    <h4 style="font-family:'Oswald';font-size:13px;color:var(--buckeye-shine);margin-top:16px;">Sync This Week from CFBD (manual backup)</h4>
     <form id="sync-form" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
       <input name="year" type="number" placeholder="Year" value="${new Date().getFullYear()}" style="width:90px;" required />
       <input name="week" type="number" placeholder="Week #" style="width:90px;" required />
@@ -239,6 +243,38 @@ export async function renderCommishTools() {
     await settleGame(f.gameId.value, parseInt(f.homeScore.value), parseInt(f.awayScore.value));
     toast("Game settled and payouts distributed.");
     f.reset();
+  });
+
+  renderGameVisibilityList();
+}
+
+// ---------- per-game show/hide toggles ----------
+// Live list, sorted chronologically. Checked = visible everywhere,
+// unchecked = hidden from Weekly Picks and the Home hub (but the game
+// stays in Firestore — nothing is deleted, existing picks on an already-
+// hidden game are unaffected, just not shown to new pickers).
+function renderGameVisibilityList() {
+  const listEl = document.getElementById("game-visibility-list");
+  if (!listEl) return;
+  onSnapshot(collection(db, "games"), (snap) => {
+    const games = snap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity));
+
+    listEl.innerHTML = games.map(g => `
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-top:1px solid #262626;">
+        <input type="checkbox" data-game-id="${g.id}" ${g.hidden ? "" : "checked"} />
+        <span style="flex:1;">${g.awayTeam} @ ${g.homeTeam}</span>
+        <span style="color:var(--gray-light);font-size:10px;">${g.kickoffMs ? new Date(g.kickoffMs).toLocaleDateString([], { month: "short", day: "numeric" }) : ""}</span>
+      </label>
+    `).join("") || `<div class="empty-state">No games yet.</div>`;
+
+    listEl.querySelectorAll("input[data-game-id]").forEach(cb => {
+      cb.addEventListener("change", async () => {
+        await updateDoc(doc(db, "games", cb.dataset.gameId), { hidden: !cb.checked });
+        toast(cb.checked ? "Game shown." : "Game hidden.");
+      });
+    });
   });
 }
 

@@ -3,12 +3,12 @@
 // Each player's action (placing a pick) is its own transaction,
 // so simultaneous picks from different players never collide.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828i";
+import { db } from "./firebase-config.js?v=20260828j";
 import {
   collection, doc, addDoc, onSnapshot, query, where,
   serverTimestamp, runTransaction, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828i";
+import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828j";
 
 const gamesEl = document.getElementById("games-list");
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule
@@ -34,11 +34,20 @@ export function renderGames() {
       gamesEl.innerHTML = "";
 
       const byKickoff = (a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity);
-      const allGames = gamesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const allGames = gamesSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(g => !g.hidden); // commissioner can hide individual games from this page
 
       const isFinished = g => g.liveStatus === "final" || g.autoSettled === true;
-      const isOngoing = g => !isFinished(g) && g.liveStatus === "live";
-      const isPickable = g => !isFinished(g) && !isOngoing(g); // hasn't started yet
+      // Kickoff time is the primary signal for "no longer pickable" — not
+      // liveStatus alone. liveStatus only updates when the background
+      // engine actually polls, which needs someone signed in; a game
+      // could sit at "scheduled" indefinitely if nobody was around right
+      // after it ended. Once kickoff has passed, it's not staying in the
+      // top pickable sections regardless of whether status has caught up.
+      const hasStarted = g => g.kickoffMs && Date.now() >= g.kickoffMs;
+      const isOngoing = g => !isFinished(g) && hasStarted(g);
+      const isPickable = g => !isFinished(g) && !hasStarted(g);
       const hasAnyPicks = g => allPicks.some(p => p.gameId === g.id);
 
       const active = allGames.filter(g => isPickable(g) && hasAnyPicks(g)).sort(byKickoff);
@@ -85,7 +94,7 @@ function renderMatchupCard(game, myPick, gamePicks) {
   div.className = "card";
   const locked = Date.now() > (game.kickoffMs || 0);
   const isFinished = game.liveStatus === "final" || game.autoSettled === true;
-  const isOngoing = !isFinished && game.liveStatus === "live";
+  const isOngoing = !isFinished && game.kickoffMs && Date.now() >= game.kickoffMs;
   const showScore = isFinished || isOngoing;
   const pot = gamePicks.reduce((s, p) => s + p.wagerAmount, 0);
   const lineTag = (game.spreadLocked || isWithinLockWindow(game))
@@ -94,7 +103,7 @@ function renderMatchupCard(game, myPick, gamePicks) {
 
   const bigScore = n => `<div style="font-family:'Anton';font-size:32px;color:var(--bone);line-height:1;">${n ?? "-"}</div>`;
   const statusLabel = isFinished ? "FINAL"
-    : isOngoing ? `Q${game.period ?? "?"} ${game.clock ?? ""}`
+    : isOngoing ? (game.period ? `Q${game.period} ${game.clock ?? ""}` : "In Progress")
     : formatKickoff(game.kickoffMs);
 
   div.innerHTML = `

@@ -4,9 +4,9 @@
 // applying balance deltas via increment() so the writes queue locally
 // and sync automatically the moment the device reconnects.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828i";
+import { db } from "./firebase-config.js?v=20260828j";
 import { collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, adjustBalanceOffline } from "./app.js?v=20260828i";
+import { currentUser, adjustBalanceOffline } from "./app.js?v=20260828j";
 
 const rowsEl = document.getElementById("entry-rows");
 const rosterCache = [];

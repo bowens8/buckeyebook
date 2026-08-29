@@ -42,10 +42,10 @@
   </div>
 
   <script type="module">
-    import { db } from "./js/firebase-config.js?v=20260828i";
+    import { db } from "./js/firebase-config.js?v=20260828j";
     import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-    import { initAuth, highlightNav, initNetworkStatus } from "./js/app.js?v=20260828i";
-    import { renderLiveScores, renderMoneyFlow } from "./js/hub.js?v=20260828i";
+    import { initAuth, highlightNav, initNetworkStatus } from "./js/app.js?v=20260828j";
+    import { renderLiveScores, renderMoneyFlow } from "./js/hub.js?v=20260828j";
 
     highlightNav();
     initNetworkStatus();
@@ -55,7 +55,9 @@
     renderMoneyFlow();
 
     onSnapshot(collection(db, "players"), s => document.getElementById("stat-players").textContent = s.size);
-    onSnapshot(collection(db, "games"), s => document.getElementById("stat-games").textContent = s.size);
+    // "Games This Week" is updated by hub.js's renderLiveScores() as a
+    // side effect of drawScores(), so it stays filtered to the current
+    // sync scope instead of showing a raw unfiltered count here.
     onSnapshot(collection(db, "picks"), s => {
       const total = s.docs.reduce((sum, d) => sum + (d.data().wagerAmount || 0), 0);
       document.getElementById("stat-pot").textContent = "$" + total;

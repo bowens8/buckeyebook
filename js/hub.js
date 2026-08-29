@@ -6,7 +6,7 @@
 // fields fresh, so every viewer here gets true real-time updates with
 // zero CFBD calls of their own.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828i";
+import { db } from "./firebase-config.js?v=20260828j";
 import { collection, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const scoresEl = document.getElementById("live-scores");
@@ -29,12 +29,19 @@ function isWithinLockWindow(game) {
 // hiding them by default would be a worse failure mode than showing an
 // occasional extra game.
 function matchesSyncScope(game) {
+  if (game.hidden) return false; // commissioner can hide individual games regardless of division/conference
   if (!latestSyncSettings) return true;
   if (!game.division) return true;
   if (!latestSyncSettings.divisions.includes(game.division)) return false;
   if (latestSyncSettings.conferences.length && !latestSyncSettings.conferences.includes(game.conference)) return false;
   return true;
 }
+
+// ---------- "Games This Week" stat, respecting the current sync scope ----------
+// Updated as a side effect of drawScores() below, since that already
+// computes the filtered game list on every games/settings change —
+// no separate listener needed, and no risk of it racing against the
+// live scores rendering over shared state.
 
 // ---------- live scores ----------
 export function renderLiveScores() {
@@ -56,13 +63,22 @@ export function renderLiveScores() {
 
 function drawScores() {
   const visibleGames = latestGames.filter(matchesSyncScope);
+
+  // Side effect: keep the "Games This Week" stat in sync with the same
+  // filtered count shown below it, rather than index.html maintaining
+  // its own separate (and previously unfiltered) listener.
+  const statEl = document.getElementById("stat-games");
+  if (statEl) statEl.textContent = visibleGames.length;
+
   if (!visibleGames.length) {
     scoresEl.innerHTML = `<div class="empty-state">No games tracked yet — sync a week from the Standings page.</div>`;
     return;
   }
   scoresEl.innerHTML = visibleGames.map(g => {
-    const statusLabel = g.liveStatus === "final" ? "FINAL"
-      : g.liveStatus === "live" ? `Q${g.period ?? "?"} ${g.clock ?? ""}`
+    const isFinished = g.liveStatus === "final" || g.autoSettled === true;
+    const isOngoing = !isFinished && g.kickoffMs && Date.now() >= g.kickoffMs;
+    const statusLabel = isFinished ? "FINAL"
+      : isOngoing ? (g.period ? `Q${g.period} ${g.clock ?? ""}` : "In Progress")
       : new Date(g.kickoffMs || 0).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
     const lineTag = (g.spreadLocked || isWithinLockWindow(g))
       ? `<span class="pill" style="margin-left:4px;">line locked</span>`
