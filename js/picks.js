@@ -3,15 +3,19 @@
 // Each player's action (placing a pick) is its own transaction,
 // so simultaneous picks from different players never collide.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828m";
+import { db } from "./firebase-config.js?v=20260828n";
 import {
   collection, doc, addDoc, onSnapshot, query, where,
   serverTimestamp, runTransaction, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828m";
+import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828n";
 
 const gamesEl = document.getElementById("games-list");
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule
+
+let currentView = "upcoming"; // or "live"
+let latestGames = [];
+let latestPicks = [];
 
 // True once a game is inside its 48-hour lock window, regardless of
 // whether the background engine has actually flipped spreadLocked yet —
@@ -22,63 +26,99 @@ function isWithinLockWindow(game) {
   return game.kickoffMs && Date.now() >= (game.kickoffMs - LOCK_WINDOW_MS);
 }
 
+const isFinished = g => g.liveStatus === "final" || g.autoSettled === true;
+// Kickoff time is the primary signal for "no longer pickable" — not
+// liveStatus alone. liveStatus only updates when the background engine
+// actually polls, which needs someone signed in; a game could sit at
+// "scheduled" indefinitely if nobody was around right after it ended.
+const hasStarted = g => g.kickoffMs && Date.now() >= g.kickoffMs;
+const isOngoing = g => !isFinished(g) && hasStarted(g);
+const isPickable = g => !isFinished(g) && !hasStarted(g);
+const byKickoff = (a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity);
+
 // ---------- render live games + this player's existing picks ----------
-// Four sections, top to bottom: games still open to pick, games nobody's
-// touched yet, games currently in progress (no longer pickable, not
-// final yet), then finished games at the very bottom. Each section
-// internally sorted chronologically.
+// Two segmented views (switched via the pill control in picks.html):
+//   Upcoming   — pickable games only. Marquee (nationally televised)
+//                games surface as their own group at the top, then
+//                everything else groups by conference.
+//   Live/Final — games currently in progress (top) and finished games
+//                (bottom), using the compact scoreline card.
 export function renderGames() {
   onSnapshot(collection(db, "games"), (gamesSnap) => {
-    onSnapshot(collection(db, "picks"), (picksSnap) => {
-      const allPicks = picksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      gamesEl.innerHTML = "";
-
-      const byKickoff = (a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity);
-      const allGames = gamesSnap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .filter(g => !g.hidden); // commissioner can hide individual games from this page
-
-      const isFinished = g => g.liveStatus === "final" || g.autoSettled === true;
-      // Kickoff time is the primary signal for "no longer pickable" — not
-      // liveStatus alone. liveStatus only updates when the background
-      // engine actually polls, which needs someone signed in; a game
-      // could sit at "scheduled" indefinitely if nobody was around right
-      // after it ended. Once kickoff has passed, it's not staying in the
-      // top pickable sections regardless of whether status has caught up.
-      const hasStarted = g => g.kickoffMs && Date.now() >= g.kickoffMs;
-      const isOngoing = g => !isFinished(g) && hasStarted(g);
-      const isPickable = g => !isFinished(g) && !hasStarted(g);
-      const hasAnyPicks = g => allPicks.some(p => p.gameId === g.id);
-
-      const active = allGames.filter(g => isPickable(g) && hasAnyPicks(g)).sort(byKickoff);
-      const untouched = allGames.filter(g => isPickable(g) && !hasAnyPicks(g)).sort(byKickoff);
-      const ongoing = allGames.filter(isOngoing).sort(byKickoff);
-      const finished = allGames.filter(isFinished).sort(byKickoff);
-
-      const renderSection = (games, headerText) => {
-        if (!games.length) return;
-        if (headerText) {
-          const header = document.createElement("div");
-          header.className = "section-title";
-          header.innerHTML = `<h2 style="font-size:18px;">${headerText}</h2>`;
-          gamesEl.appendChild(header);
-        }
-        games.forEach(game => {
-          const myPick = allPicks.find(p => p.gameId === game.id && p.playerId === currentUser?.uid);
-          gamesEl.appendChild(renderMatchupCard(game, myPick, allPicks.filter(p => p.gameId === game.id)));
-        });
-      };
-
-      renderSection(active, null); // no header — this is the "main" list at the top
-      renderSection(untouched, "Nobody's Picked Yet");
-      renderSection(ongoing, "In Progress");
-      renderSection(finished, "Finished");
-
-      if (!allGames.length) {
-        gamesEl.innerHTML = `<div class="empty-state">No games loaded yet. Commissioner: add matchups in Firestore → games.</div>`;
-      }
-    });
+    latestGames = gamesSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(g => !g.hidden); // commissioner can hide individual games from this page
+    renderCurrentView();
   });
+  onSnapshot(collection(db, "picks"), (picksSnap) => {
+    latestPicks = picksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderCurrentView();
+  });
+}
+
+export function setView(view) {
+  currentView = view;
+  document.querySelectorAll(".segmented button").forEach(b => b.classList.toggle("active", b.dataset.view === view));
+  renderCurrentView();
+}
+window.setPicksView = setView;
+
+function renderCurrentView() {
+  gamesEl.innerHTML = "";
+  if (!latestGames.length) {
+    gamesEl.innerHTML = `<div class="empty-state">No games loaded yet. Commissioner: add matchups in Firestore → games.</div>`;
+    return;
+  }
+  if (currentView === "live") renderLiveFinalView();
+  else renderUpcomingView();
+}
+
+function renderSection(games, headerHtml) {
+  if (!games.length) return;
+  if (headerHtml) {
+    const header = document.createElement("div");
+    header.innerHTML = headerHtml;
+    gamesEl.appendChild(header.firstElementChild);
+  }
+  games.forEach(game => {
+    const myPick = latestPicks.find(p => p.gameId === game.id && p.playerId === currentUser?.uid);
+    gamesEl.appendChild(renderMatchupCard(game, myPick, latestPicks.filter(p => p.gameId === game.id)));
+  });
+}
+
+// ---------- Upcoming: marquee games first, then grouped by conference ----------
+function renderUpcomingView() {
+  const pickable = latestGames.filter(isPickable);
+  if (!pickable.length) {
+    gamesEl.innerHTML = `<div class="empty-state">Nothing upcoming right now — check the Live/Final tab.</div>`;
+    return;
+  }
+
+  const marquee = pickable.filter(g => g.tvOutlet).sort(byKickoff);
+  const rest = pickable.filter(g => !g.tvOutlet);
+
+  renderSection(marquee, `<div class="marquee-group-header">📺 Marquee Matchups</div>`);
+
+  const byConference = {};
+  rest.forEach(g => {
+    const key = g.conference || "Other";
+    (byConference[key] ||= []).push(g);
+  });
+  Object.keys(byConference).sort().forEach(conf => {
+    renderSection(byConference[conf].sort(byKickoff), `<div class="conference-group-header">${conf}</div>`);
+  });
+}
+
+// ---------- Live/Final: in-progress on top, finished below ----------
+function renderLiveFinalView() {
+  const ongoing = latestGames.filter(isOngoing).sort(byKickoff);
+  const finished = latestGames.filter(isFinished).sort(byKickoff);
+  if (!ongoing.length && !finished.length) {
+    gamesEl.innerHTML = `<div class="empty-state">Nothing live or finished yet — check the Upcoming tab.</div>`;
+    return;
+  }
+  renderSection(ongoing, `<div class="section-title"><h2 style="font-size:18px;">In Progress</h2></div>`);
+  renderSection(finished, `<div class="section-title"><h2 style="font-size:18px;">Finished</h2></div>`);
 }
 
 function formatKickoff(kickoffMs) {
