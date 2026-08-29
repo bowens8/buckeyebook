@@ -4,7 +4,7 @@
 // synthetic address), live balance chip, nav highlighting,
 // online/offline indicator, and safe balance transactions.
 // ============================================================
-import { db, auth } from "./firebase-config.js?v=20260828l";
+import { db, auth } from "./firebase-config.js?v=20260828m";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   doc, getDoc, onSnapshot, runTransaction, collection,
@@ -23,6 +23,18 @@ function toast(msg) {
   setTimeout(() => t.remove(), 2800);
 }
 window.toast = toast;
+
+// ---------- defeat bfcache so every tab click is a genuine fresh load ----------
+// Modern browsers can restore a page from a frozen "back/forward cache"
+// snapshot instead of truly re-running its scripts, which means nav
+// clicks (and back/forward) can silently skip re-subscribing all the
+// live Firestore listeners and the engine's immediate poll-on-load —
+// data just sits stale until something else triggers a refresh. Forcing
+// a real reload whenever a page is restored from bfcache guarantees
+// every tab click actually re-runs everything, every time.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) location.reload();
+});
 
 // ---------- auth guard: every page (but login.html) requires a session ----------
 export function initAuth(onReady) {
@@ -74,7 +86,7 @@ export function initAuth(onReady) {
       // whoever happens to have it open, rather than one specific
       // commissioner tab. See live-data-engine.js for the trade-off
       // this implies for the security rules.
-      import("./live-data-engine.js?v=20260828l").then(m => m.startLiveDataEngine());
+      import("./live-data-engine.js?v=20260828m").then(m => m.startLiveDataEngine());
       if (onReady) onReady(currentUser);
     }, (err) => {
       // Without this, a Firestore permission error (e.g. rules not

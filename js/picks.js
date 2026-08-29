@@ -3,12 +3,12 @@
 // Each player's action (placing a pick) is its own transaction,
 // so simultaneous picks from different players never collide.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828l";
+import { db } from "./firebase-config.js?v=20260828m";
 import {
   collection, doc, addDoc, onSnapshot, query, where,
   serverTimestamp, runTransaction, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828l";
+import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828m";
 
 const gamesEl = document.getElementById("games-list");
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule

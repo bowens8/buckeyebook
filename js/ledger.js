@@ -3,14 +3,14 @@
 // transaction history, and commissioner tools: CFBD weekly sync,
 // manual matchup entry, game settlement, commissioner grants.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828l";
+import { db } from "./firebase-config.js?v=20260828m";
 import {
   collection, addDoc, doc, updateDoc, onSnapshot, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, settleUp } from "./app.js?v=20260828l";
-import { settleGame } from "./picks.js?v=20260828l";
-import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js?v=20260828l";
-import { COMMISSIONER_CODE } from "./firebase-config.js?v=20260828l";
+import { currentUser, settleUp } from "./app.js?v=20260828m";
+import { settleGame } from "./picks.js?v=20260828m";
+import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js?v=20260828m";
+import { COMMISSIONER_CODE } from "./firebase-config.js?v=20260828m";
 
 const standingsEl = document.getElementById("standings");
 const historyEl = document.getElementById("history");
@@ -227,9 +227,14 @@ export async function renderCommishTools() {
     const statusEl = document.getElementById("sync-status");
     statusEl.textContent = "Pulling from CollegeFootballData...";
     try {
-      const count = await syncWeek(parseInt(f.year.value), parseInt(f.week.value));
-      statusEl.textContent = `Synced ${count} games. Re-run anytime — it updates spreads, never duplicates.`;
-      toast(`${count} games synced.`);
+      const { count, tvFilterApplied } = await syncWeek(parseInt(f.year.value), parseInt(f.week.value));
+      if (!tvFilterApplied) {
+        statusEl.textContent = `Synced ${count} games, but the TV filter couldn't be applied this time (CollegeFootballData's broadcast data didn't come back as expected) — every game in scope was synced instead. Check the console for details, or try again.`;
+        toast("Synced, but TV filter didn't apply — see status message.");
+      } else {
+        statusEl.textContent = `Synced ${count} games. Re-run anytime — it updates spreads, never duplicates.`;
+        toast(`${count} games synced.`);
+      }
     } catch (err) {
       statusEl.textContent = "Sync failed — check your CFBD_API_KEY in firebase-config.js.";
     }

@@ -4,7 +4,7 @@
 // keyed by CFBD's own game id so re-syncing never duplicates.
 // Commissioner-only action, triggered from ledger.html.
 // ============================================================
-import { db, CFBD_API_KEY } from "./firebase-config.js?v=20260828l";
+import { db, CFBD_API_KEY } from "./firebase-config.js?v=20260828m";
 import { doc, getDoc, setDoc, getDocs, collection, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const BASE = "https://api.collegefootballdata.com";
@@ -66,25 +66,39 @@ export async function syncWeek(year, week, seasonType = "regular") {
   const settings = await getSyncSettings();
   const combos = buildScopeCombos(settings);
 
-  const [gameResults, lineResults, mediaResults, existingSnap] = await Promise.all([
+  const [gameResults, lineResults, existingSnap] = await Promise.all([
     Promise.all(combos.map(c => cfbdGet(
       `/games?year=${year}&week=${week}&seasonType=${seasonType}&division=${c.division}${c.conference ? `&conference=${c.conference}` : ""}`
     ))),
     Promise.all(combos.map(c => cfbdGet(
       `/lines?year=${year}&week=${week}&seasonType=${seasonType}${c.conference ? `&conference=${c.conference}` : ""}`
     ))),
-    // Only bother fetching broadcast data if the commissioner actually
-    // wants to filter on it — this is an extra API call otherwise unused.
-    settings.tvOnly ? cfbdGet(`/games/media?year=${year}&week=${week}&seasonType=${seasonType}`) : Promise.resolve([]),
     getDocs(query(collection(db, "games"), where("year", "==", year), where("week", "==", week)))
   ]);
 
-  // Map of gameId -> best outlet name, e.g. "ESPN", "ABC", "FOX". A game
-  // can have multiple media entries (TV + streaming) — take the first.
-  const outletByGame = {};
-  mediaResults.forEach(m => {
-    if (!outletByGame[m.id]) outletByGame[m.id] = m.outlet || m.mediaType || null;
-  });
+  // Broadcast data is fetched separately from games/lines above, in its
+  // own try/catch — if CFBD's media endpoint errors out or the response
+  // shape doesn't match what's expected, that must NOT take down the
+  // whole sync (games/lines already succeeded and shouldn't be lost).
+  // Field names are also read defensively (a couple of plausible
+  // variants tried for both the game id and the outlet name) since this
+  // endpoint's exact schema wasn't verified against the live API.
+  let outletByGame = {};
+  let tvFetchOk = true;
+  if (settings.tvOnly) {
+    try {
+      const mediaResults = await cfbdGet(`/games/media?year=${year}&week=${week}&seasonType=${seasonType}`);
+      mediaResults.forEach(m => {
+        const gameId = m.id ?? m.gameId ?? m.game_id;
+        const outlet = m.outlet ?? m.network ?? m.mediaType ?? m.media_type ?? m.name;
+        if (gameId != null && outlet && !outletByGame[gameId]) outletByGame[gameId] = outlet;
+      });
+      if (!Object.keys(outletByGame).length) tvFetchOk = false; // suspicious — likely a schema mismatch, not "no TV games this week"
+    } catch (err) {
+      console.warn("TV/media fetch failed, skipping TV filter for this sync:", err);
+      tvFetchOk = false;
+    }
+  }
 
   // Merge + de-dupe by game id, since overlapping combos (e.g. two
   // conferences within the same division call) can return the same game.
@@ -101,8 +115,10 @@ export async function syncWeek(year, week, seasonType = "regular") {
   let games = [...gameById.values()];
 
   // "Big ticket" filter: only keep games with a known broadcast outlet,
-  // optionally narrowed further to a specific list of networks.
-  if (settings.tvOnly) {
+  // optionally narrowed further to a specific list of networks. Skipped
+  // entirely (rather than zeroing out every game) if the broadcast data
+  // itself couldn't be fetched or parsed this time.
+  if (settings.tvOnly && tvFetchOk) {
     games = games.filter(g => {
       const outlet = outletByGame[g.id];
       if (!outlet) return false;
@@ -151,7 +167,7 @@ export async function syncWeek(year, week, seasonType = "regular") {
     await setDoc(doc(db, "games", String(g.id)), payload, { merge: true });
     count++;
   }
-  return count;
+  return { count, tvFilterApplied: !settings.tvOnly || tvFetchOk };
 }
 
 // ---------- auto-discover and sync the current + next CFBD week ----------
@@ -181,7 +197,7 @@ export async function autoSyncActiveWeeks() {
 
   let total = 0;
   for (const w of weeks) {
-    total += await syncWeek(year, w.week, "regular");
+    total += (await syncWeek(year, w.week, "regular")).count;
   }
   return total;
 }
