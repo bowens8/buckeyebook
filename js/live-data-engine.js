@@ -14,11 +14,11 @@
 // Spread lock rule: once within 48 hours of kickoff, whatever line CFBD
 // is showing gets frozen permanently. Before that, it moves with CFBD.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828n";
+import { db } from "./firebase-config.js?v=20260828o";
 import { collection, onSnapshot, doc, updateDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { fetchLiveScores, fetchLines, autoSyncActiveWeeks } from "./cfbd.js?v=20260828n";
-import { currentUser } from "./app.js?v=20260828n";
-import { settleGame } from "./picks.js?v=20260828n";
+import { fetchLiveScores, fetchLines, autoSyncActiveWeeks } from "./cfbd.js?v=20260828o";
+import { currentUser } from "./app.js?v=20260828o";
+import { settleGame } from "./picks.js?v=20260828o";
 
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000;
 const AUTO_SYNC_THROTTLE_MS = 12 * 60 * 60 * 1000; // don't re-check the calendar more than twice a day per device

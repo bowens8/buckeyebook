@@ -3,12 +3,12 @@
 // Each player's action (placing a pick) is its own transaction,
 // so simultaneous picks from different players never collide.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828n";
+import { db } from "./firebase-config.js?v=20260828o";
 import {
   collection, doc, addDoc, onSnapshot, query, where,
   serverTimestamp, runTransaction, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828n";
+import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828o";
 
 const gamesEl = document.getElementById("games-list");
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule
@@ -111,8 +111,19 @@ function renderUpcomingView() {
 
 // ---------- Live/Final: in-progress on top, finished below ----------
 function renderLiveFinalView() {
-  const ongoing = latestGames.filter(isOngoing).sort(byKickoff);
-  const finished = latestGames.filter(isFinished).sort(byKickoff);
+  // Games with any picks on them (by anyone in the pool, not just you)
+  // surface first within each section — those are the ones that
+  // actually matter to check on. Chronological order is the tiebreaker
+  // within each group.
+  const hasAnyPicks = g => latestPicks.some(p => p.gameId === g.id);
+  const byPicksThenKickoff = (a, b) => {
+    const aHas = hasAnyPicks(a), bHas = hasAnyPicks(b);
+    if (aHas !== bHas) return aHas ? -1 : 1;
+    return byKickoff(a, b);
+  };
+
+  const ongoing = latestGames.filter(isOngoing).sort(byPicksThenKickoff);
+  const finished = latestGames.filter(isFinished).sort(byPicksThenKickoff);
   if (!ongoing.length && !finished.length) {
     gamesEl.innerHTML = `<div class="empty-state">Nothing live or finished yet — check the Upcoming tab.</div>`;
     return;
