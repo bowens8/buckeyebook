@@ -140,6 +140,30 @@ nav.tabs a.active {
 }
 .card h3 { font-size: 18px; margin-bottom: 12px; }
 
+/* ---------- compact scoreline (finished/in-progress games) ---------- */
+.scoreline { margin-top: 10px; }
+.score-team-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 0;
+  border-top: 1px solid #262626;
+}
+.score-team-row:first-child { border-top: none; }
+.score-team-name {
+  font-family: 'Oswald';
+  font-size: 15px;
+  color: var(--gray-light);
+}
+.score-team-row.winner .score-team-name { color: var(--bone); font-weight: 500; }
+.score-team-num {
+  font-family: 'Anton';
+  font-size: 26px;
+  color: var(--gray-light);
+  line-height: 1;
+}
+.score-team-row.winner .score-team-num { color: var(--scarlet); }
+
 .matchup {
   display: flex;
   justify-content: space-between;

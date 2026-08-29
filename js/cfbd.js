@@ -4,7 +4,7 @@
 // keyed by CFBD's own game id so re-syncing never duplicates.
 // Commissioner-only action, triggered from ledger.html.
 // ============================================================
-import { db, CFBD_API_KEY } from "./firebase-config.js?v=20260828j";
+import { db, CFBD_API_KEY } from "./firebase-config.js?v=20260828l";
 import { doc, getDoc, setDoc, getDocs, collection, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const BASE = "https://api.collegefootballdata.com";
@@ -38,16 +38,18 @@ export async function fetchConferenceList() {
 // engine. Defaults to FBS/all-conferences if nothing's been configured.
 export async function getSyncSettings() {
   const snap = await getDoc(doc(db, "settings", "sync"));
-  if (!snap.exists()) return { divisions: ["fbs"], conferences: [] };
+  if (!snap.exists()) return { divisions: ["fbs"], conferences: [], tvOnly: false, tvNetworks: [] };
   const d = snap.data();
   return {
     divisions: d.divisions?.length ? d.divisions : ["fbs"],
-    conferences: d.conferences || [] // empty = no conference filter within the chosen division(s)
+    conferences: d.conferences || [], // empty = no conference filter within the chosen division(s)
+    tvOnly: d.tvOnly || false, // when true, only games with a known national broadcast/stream get synced
+    tvNetworks: d.tvNetworks || [] // empty = any outlet counts; otherwise only these specific ones
   };
 }
 
-export async function saveSyncSettings(divisions, conferences) {
-  await setDoc(doc(db, "settings", "sync"), { divisions, conferences, updatedAt: serverTimestamp() });
+export async function saveSyncSettings(divisions, conferences, tvOnly, tvNetworks) {
+  await setDoc(doc(db, "settings", "sync"), { divisions, conferences, tvOnly, tvNetworks, updatedAt: serverTimestamp() });
 }
 
 // Builds the division/conference query-string combos to fetch. Multiple
@@ -64,15 +66,25 @@ export async function syncWeek(year, week, seasonType = "regular") {
   const settings = await getSyncSettings();
   const combos = buildScopeCombos(settings);
 
-  const [gameResults, lineResults, existingSnap] = await Promise.all([
+  const [gameResults, lineResults, mediaResults, existingSnap] = await Promise.all([
     Promise.all(combos.map(c => cfbdGet(
       `/games?year=${year}&week=${week}&seasonType=${seasonType}&division=${c.division}${c.conference ? `&conference=${c.conference}` : ""}`
     ))),
     Promise.all(combos.map(c => cfbdGet(
       `/lines?year=${year}&week=${week}&seasonType=${seasonType}${c.conference ? `&conference=${c.conference}` : ""}`
     ))),
+    // Only bother fetching broadcast data if the commissioner actually
+    // wants to filter on it — this is an extra API call otherwise unused.
+    settings.tvOnly ? cfbdGet(`/games/media?year=${year}&week=${week}&seasonType=${seasonType}`) : Promise.resolve([]),
     getDocs(query(collection(db, "games"), where("year", "==", year), where("week", "==", week)))
   ]);
+
+  // Map of gameId -> best outlet name, e.g. "ESPN", "ABC", "FOX". A game
+  // can have multiple media entries (TV + streaming) — take the first.
+  const outletByGame = {};
+  mediaResults.forEach(m => {
+    if (!outletByGame[m.id]) outletByGame[m.id] = m.outlet || m.mediaType || null;
+  });
 
   // Merge + de-dupe by game id, since overlapping combos (e.g. two
   // conferences within the same division call) can return the same game.
@@ -86,7 +98,19 @@ export async function syncWeek(year, week, seasonType = "regular") {
       if (!gameById.has(g.id)) gameById.set(g.id, { ...g, _syncDivision: combo.division, _syncConference: combo.conference });
     });
   });
-  const games = [...gameById.values()];
+  let games = [...gameById.values()];
+
+  // "Big ticket" filter: only keep games with a known broadcast outlet,
+  // optionally narrowed further to a specific list of networks.
+  if (settings.tvOnly) {
+    games = games.filter(g => {
+      const outlet = outletByGame[g.id];
+      if (!outlet) return false;
+      if (!settings.tvNetworks.length) return true;
+      return settings.tvNetworks.some(n => outlet.toUpperCase().includes(n.toUpperCase()));
+    });
+  }
+
   const lines = lineResults.flat();
 
   // Once the background engine has locked a line, a manual re-sync must
@@ -113,6 +137,7 @@ export async function syncWeek(year, week, seasonType = "regular") {
       awayTeam: g.awayTeam,
       division: g._syncDivision,
       conference: g._syncConference || g.homeConference || null,
+      tvOutlet: outletByGame[g.id] || null,
       kickoffMs: g.startDate ? new Date(g.startDate).getTime() : null,
       venue: g.venue || null,
       status: "scheduled",

@@ -3,14 +3,14 @@
 // transaction history, and commissioner tools: CFBD weekly sync,
 // manual matchup entry, game settlement, commissioner grants.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828j";
+import { db } from "./firebase-config.js?v=20260828l";
 import {
   collection, addDoc, doc, updateDoc, onSnapshot, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, settleUp } from "./app.js?v=20260828j";
-import { settleGame } from "./picks.js?v=20260828j";
-import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js?v=20260828j";
-import { COMMISSIONER_CODE } from "./firebase-config.js?v=20260828j";
+import { currentUser, settleUp } from "./app.js?v=20260828l";
+import { settleGame } from "./picks.js?v=20260828l";
+import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js?v=20260828l";
+import { COMMISSIONER_CODE } from "./firebase-config.js?v=20260828l";
 
 const standingsEl = document.getElementById("standings");
 const historyEl = document.getElementById("history");
@@ -150,12 +150,21 @@ export async function renderCommishTools() {
         <div style="font-size:11px;color:var(--gray-light);margin-bottom:4px;">Conferences (leave all unchecked to include every conference in the divisions above)</div>
         <div id="conference-checkboxes">${renderConferenceCheckboxes(settings.divisions)}</div>
       </div>
+      <div>
+        <label style="font-size:12px;display:flex;align-items:center;gap:6px;">
+          <input type="checkbox" name="tvOnly" ${settings.tvOnly ? "checked" : ""} /> Only sync games with national TV/streaming coverage
+        </label>
+        <p style="font-size:10px;color:var(--gray-light);margin:4px 0 0;">This is the real "big ticket game" filter — most weeks, only a fraction of games actually get broadcast nationally. Combine with the division/conference filter above for the tightest list.</p>
+        <input name="tvNetworks" placeholder="Optional: specific networks only (comma-separated, e.g. ABC, ESPN, FOX)" value="${(settings.tvNetworks || []).join(", ")}" style="width:100%;margin-top:6px;" />
+        <p style="font-size:10px;color:var(--gray-light);margin:4px 0 0;">Leave blank to include any broadcast/streaming outlet CFBD has listed for the game.</p>
+      </div>
       <button type="submit" class="small" style="width:fit-content;">Save Sync Settings</button>
     </form>
     <p id="scope-status" style="font-size:12px;color:var(--gray-light);margin-top:6px;"></p>
+    <p style="font-size:11px;color:var(--gray-light);margin-top:2px;">Note: these filters only affect games synced from now on. Anything already sitting on Weekly Picks from before you enabled a filter needs to be cleaned up once using "Show/Hide Specific Games" below.</p>
 
     <h4 style="font-family:'Oswald';font-size:13px;color:var(--buckeye-shine);margin-top:20px;">Show/Hide Specific Games</h4>
-    <p style="font-size:11px;color:var(--gray-light);">Beyond the division/conference filter above, uncheck any individual game to hide it from Weekly Picks and the Home hub entirely — it stays in the database, just out of sight everywhere players look.</p>
+    <p style="font-size:11px;color:var(--gray-light);">Beyond the filters above, uncheck any individual game to hide it from Weekly Picks and the Home hub entirely — it stays in the database, just out of sight everywhere players look.</p>
     <div id="game-visibility-list" style="max-height:260px;overflow-y:auto;border:1px solid #2a2a2a;border-radius:var(--radius);padding:8px;"></div>
 
     <h4 style="font-family:'Oswald';font-size:13px;color:var(--buckeye-shine);margin-top:16px;">Sync This Week from CFBD (manual backup)</h4>
@@ -191,7 +200,9 @@ export async function renderCommishTools() {
     const divisions = [...f.querySelectorAll('input[name="division"]:checked')].map(cb => cb.value);
     if (!divisions.length) { toast("Pick at least one division."); return; }
     const conferences = [...f.querySelectorAll('input[name="conference"]:checked')].map(cb => cb.value);
-    await saveSyncSettings(divisions, conferences);
+    const tvOnly = f.tvOnly.checked;
+    const tvNetworks = f.tvNetworks.value.split(",").map(s => s.trim().toUpperCase()).filter(Boolean);
+    await saveSyncSettings(divisions, conferences, tvOnly, tvNetworks);
     document.getElementById("scope-status").textContent = "Saved — takes effect on the next sync (manual or automatic).";
     toast("Sync settings saved.");
   });
@@ -265,6 +276,7 @@ function renderGameVisibilityList() {
       <label style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-top:1px solid #262626;">
         <input type="checkbox" data-game-id="${g.id}" ${g.hidden ? "" : "checked"} />
         <span style="flex:1;">${g.awayTeam} @ ${g.homeTeam}</span>
+        ${g.tvOutlet ? `<span class="pill">${g.tvOutlet}</span>` : ""}
         <span style="color:var(--gray-light);font-size:10px;">${g.kickoffMs ? new Date(g.kickoffMs).toLocaleDateString([], { month: "short", day: "numeric" }) : ""}</span>
       </label>
     `).join("") || `<div class="empty-state">No games yet.</div>`;

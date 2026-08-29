@@ -3,12 +3,12 @@
 // Each player's action (placing a pick) is its own transaction,
 // so simultaneous picks from different players never collide.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828j";
+import { db } from "./firebase-config.js?v=20260828l";
 import {
   collection, doc, addDoc, onSnapshot, query, where,
   serverTimestamp, runTransaction, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828j";
+import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828l";
 
 const gamesEl = document.getElementById("games-list");
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule
@@ -101,28 +101,65 @@ function renderMatchupCard(game, myPick, gamePicks) {
     ? `<span class="tier-tag pending" style="margin-left:6px;">line locked</span>`
     : game.spread != null ? `<span class="tier-tag" style="margin-left:6px;background:rgba(255,255,255,0.08);color:var(--gray-light);">line moving</span>` : "";
 
-  const bigScore = n => `<div style="font-family:'Anton';font-size:32px;color:var(--bone);line-height:1;">${n ?? "-"}</div>`;
+  const scoreline = () => {
+    const awayScore = game.awayScore;
+    const homeScore = game.homeScore;
+    const awayWon = isFinished && awayScore != null && homeScore != null && awayScore > homeScore;
+    const homeWon = isFinished && awayScore != null && homeScore != null && homeScore > awayScore;
+    return `
+      <div class="scoreline">
+        <div class="score-team-row ${awayWon ? "winner" : ""}">
+          <span class="score-team-name">${game.awayTeam}</span>
+          <span class="score-team-num">${awayScore ?? "-"}</span>
+        </div>
+        <div class="score-team-row ${homeWon ? "winner" : ""}">
+          <span class="score-team-name">${game.homeTeam}</span>
+          <span class="score-team-num">${homeScore ?? "-"}</span>
+        </div>
+      </div>
+    `;
+  };
+
   const statusLabel = isFinished ? "FINAL"
     : isOngoing ? (game.period ? `Q${game.period} ${game.clock ?? ""}` : "In Progress")
     : formatKickoff(game.kickoffMs);
+  const tvBadge = game.tvOutlet ? `<span class="tier-tag" style="margin-left:6px;background:rgba(255,255,255,0.08);color:var(--buckeye-shine);">📺 ${game.tvOutlet}</span>` : "";
 
-  div.innerHTML = `
-    <div style="font-family:'Oswald';font-size:11px;color:${isFinished ? "var(--scarlet)" : isOngoing ? "#6fd39a" : "var(--buckeye-shine)"};letter-spacing:0.05em;text-transform:uppercase;">
-      ${statusLabel}
+  const footerNote = isFinished
+    ? `Final · $${pot} pot · ${gamePicks.length} pick(s) settled`
+    : isOngoing
+      ? `In progress · $${pot} pot · ${gamePicks.length} pick(s) locked in`
+      : `Pool so far: $${pot} · ${gamePicks.length} pick(s) ${locked ? "· LOCKED" : ""} ${lineTag}`;
+
+  div.innerHTML = showScore ? `
+    <div style="font-family:'Oswald';font-size:11px;color:${isFinished ? "var(--scarlet)" : "#6fd39a"};letter-spacing:0.05em;text-transform:uppercase;">
+      ${statusLabel}${tvBadge}
+    </div>
+    <div style="font-family:'Oswald';font-size:13px;color:var(--gray-light);margin-top:2px;">
+      ${game.awayTeam} @ ${game.homeTeam}
+    </div>
+    ${scoreline()}
+    <div class="meta" style="color:var(--gray-light);font-size:12px;margin-top:8px;">
+      ${footerNote}
+    </div>
+    ${myPick ? renderMyPick(myPick, game, true) : `<div class="empty-state" style="padding:12px 0;">You didn't pick this one.</div>`}
+  ` : `
+    <div style="font-family:'Oswald';font-size:11px;color:var(--buckeye-shine);letter-spacing:0.05em;text-transform:uppercase;">
+      ${statusLabel}${tvBadge}
     </div>
     <div class="matchup">
       <div class="team-block">
         <div class="team-name">${game.awayTeam}</div>
-        ${showScore ? bigScore(game.awayScore) : `<div class="spread">${spreadLabel(game, "away")}</div>`}
+        <div class="spread">${spreadLabel(game, "away")}</div>
       </div>
       <div class="vs">@</div>
       <div class="team-block" style="text-align:right">
         <div class="team-name">${game.homeTeam}</div>
-        ${showScore ? bigScore(game.homeScore) : `<div class="spread">${spreadLabel(game, "home")}</div>`}
+        <div class="spread">${spreadLabel(game, "home")}</div>
       </div>
     </div>
     <div class="meta" style="color:var(--gray-light);font-size:12px;margin-top:6px;">
-      Pool so far: $${pot} · ${gamePicks.length} pick(s) ${locked ? "· LOCKED" : ""} ${lineTag}
+      ${footerNote}
     </div>
     ${myPick ? renderMyPick(myPick, game, locked) : (locked ? `<div class="empty-state">Picks closed at kickoff.</div>` : renderPickForm(game))}
   `;
