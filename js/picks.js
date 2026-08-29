@@ -3,12 +3,12 @@
 // Each player's action (placing a pick) is its own transaction,
 // so simultaneous picks from different players never collide.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828p";
+import { db } from "./firebase-config.js?v=20260828q";
 import {
   collection, doc, addDoc, onSnapshot, query, where,
   serverTimestamp, runTransaction, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828p";
+import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828q";
 
 const gamesEl = document.getElementById("games-list");
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule
@@ -24,9 +24,14 @@ let latestSyncSettings = null; // null = not loaded yet, show everything rather 
 // affecting future syncs while old games from it linger forever.
 function matchesSyncScope(game) {
   if (game.hidden) return false;
-  if (!latestSyncSettings) return true;
-  if (!game.division) return true; // no tag yet (pre-dates this feature or manually added) — show by default
-  if (!latestSyncSettings.divisions.includes(game.division)) return false;
+  // Strict: what's synced is what's displayed, with no benefit-of-the-
+  // doubt for games missing a division/conference tag. Manually-added
+  // matchups (via "Add a Matchup Manually") are the one deliberate
+  // exception — those never go through CFBD sync at all, so they don't
+  // have this metadata by design and shouldn't be punished for it.
+  if (game.source === "manual") return true;
+  if (!latestSyncSettings) return false; // settings haven't loaded yet — don't show anything until we actually know the scope
+  if (!game.division || !latestSyncSettings.divisions.includes(game.division)) return false;
   if (latestSyncSettings.conferences.length && !latestSyncSettings.conferences.includes(game.conference)) return false;
   return true;
 }

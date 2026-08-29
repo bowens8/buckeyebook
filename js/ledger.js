@@ -3,14 +3,14 @@
 // transaction history, and commissioner tools: CFBD weekly sync,
 // manual matchup entry, game settlement, commissioner grants.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828p";
+import { db } from "./firebase-config.js?v=20260828q";
 import {
   collection, addDoc, doc, updateDoc, onSnapshot, query, where, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, settleUp } from "./app.js?v=20260828p";
-import { settleGame } from "./picks.js?v=20260828p";
-import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js?v=20260828p";
-import { COMMISSIONER_CODE } from "./firebase-config.js?v=20260828p";
+import { currentUser, settleUp } from "./app.js?v=20260828q";
+import { settleGame } from "./picks.js?v=20260828q";
+import { syncWeek, getSyncSettings, saveSyncSettings, fetchConferenceList } from "./cfbd.js?v=20260828q";
+import { COMMISSIONER_CODE } from "./firebase-config.js?v=20260828q";
 
 const standingsEl = document.getElementById("standings");
 const historyEl = document.getElementById("history");

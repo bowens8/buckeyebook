@@ -6,7 +6,7 @@
 // fields fresh, so every viewer here gets true real-time updates with
 // zero CFBD calls of their own.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828p";
+import { db } from "./firebase-config.js?v=20260828q";
 import { collection, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 const scoresEl = document.getElementById("live-scores");
@@ -30,9 +30,12 @@ function isWithinLockWindow(game) {
 // occasional extra game.
 function matchesSyncScope(game) {
   if (game.hidden) return false; // commissioner can hide individual games regardless of division/conference
-  if (!latestSyncSettings) return true;
-  if (!game.division) return true;
-  if (!latestSyncSettings.divisions.includes(game.division)) return false;
+  // Strict: what's synced is what's displayed, with no benefit-of-the-
+  // doubt for games missing a division/conference tag. Manually-added
+  // matchups are the one deliberate exception — see picks.js for why.
+  if (game.source === "manual") return true;
+  if (!latestSyncSettings) return false;
+  if (!game.division || !latestSyncSettings.divisions.includes(game.division)) return false;
   if (latestSyncSettings.conferences.length && !latestSyncSettings.conferences.includes(game.conference)) return false;
   return true;
 }
