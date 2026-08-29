@@ -4,7 +4,7 @@
 // synthetic address), live balance chip, nav highlighting,
 // online/offline indicator, and safe balance transactions.
 // ============================================================
-import { db, auth } from "./firebase-config.js?v=20260828o";
+import { db, auth } from "./firebase-config.js?v=20260828p";
 import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   doc, getDoc, onSnapshot, runTransaction, collection,
@@ -86,7 +86,7 @@ export function initAuth(onReady) {
       // whoever happens to have it open, rather than one specific
       // commissioner tab. See live-data-engine.js for the trade-off
       // this implies for the security rules.
-      import("./live-data-engine.js?v=20260828o").then(m => m.startLiveDataEngine());
+      import("./live-data-engine.js?v=20260828p").then(m => m.startLiveDataEngine());
       if (onReady) onReady(currentUser);
     }, (err) => {
       // Without this, a Firestore permission error (e.g. rules not

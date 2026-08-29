@@ -3,12 +3,12 @@
 // Each player's action (placing a pick) is its own transaction,
 // so simultaneous picks from different players never collide.
 // ============================================================
-import { db } from "./firebase-config.js?v=20260828o";
+import { db } from "./firebase-config.js?v=20260828p";
 import {
   collection, doc, addDoc, onSnapshot, query, where,
   serverTimestamp, runTransaction, getDocs
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828o";
+import { currentUser, debitBalance, creditBalance, awardLeaf } from "./app.js?v=20260828p";
 
 const gamesEl = document.getElementById("games-list");
 const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock rule
@@ -16,6 +16,20 @@ const LOCK_WINDOW_MS = 48 * 60 * 60 * 1000; // matches the engine's actual lock 
 let currentView = "upcoming"; // or "live"
 let latestGames = [];
 let latestPicks = [];
+let latestSyncSettings = null; // null = not loaded yet, show everything rather than hide games prematurely
+
+// Only show games that match what the commissioner currently has synced
+// — same logic as the Home hub. This is what makes unchecking a
+// conference actually remove its games from this page, instead of just
+// affecting future syncs while old games from it linger forever.
+function matchesSyncScope(game) {
+  if (game.hidden) return false;
+  if (!latestSyncSettings) return true;
+  if (!game.division) return true; // no tag yet (pre-dates this feature or manually added) — show by default
+  if (!latestSyncSettings.divisions.includes(game.division)) return false;
+  if (latestSyncSettings.conferences.length && !latestSyncSettings.conferences.includes(game.conference)) return false;
+  return true;
+}
 
 // True once a game is inside its 48-hour lock window, regardless of
 // whether the background engine has actually flipped spreadLocked yet —
@@ -44,15 +58,28 @@ const byKickoff = (a, b) => (a.kickoffMs ?? Infinity) - (b.kickoffMs ?? Infinity
 //   Live/Final — games currently in progress (top) and finished games
 //                (bottom), using the compact scoreline card.
 export function renderGames() {
-  onSnapshot(collection(db, "games"), (gamesSnap) => {
-    latestGames = gamesSnap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(g => !g.hidden); // commissioner can hide individual games from this page
+  let rawGames = [];
+
+  const applyFilterAndRender = () => {
+    latestGames = rawGames.filter(matchesSyncScope);
     renderCurrentView();
+  };
+
+  onSnapshot(collection(db, "games"), (gamesSnap) => {
+    rawGames = gamesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    applyFilterAndRender();
   });
   onSnapshot(collection(db, "picks"), (picksSnap) => {
     latestPicks = picksSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     renderCurrentView();
+  });
+  onSnapshot(doc(db, "settings", "sync"), (snap) => {
+    latestSyncSettings = snap.exists()
+      ? { divisions: snap.data().divisions?.length ? snap.data().divisions : ["fbs"], conferences: snap.data().conferences || [] }
+      : { divisions: ["fbs"], conferences: [] };
+    applyFilterAndRender(); // re-run the filter against whatever games we already have
+  }, (err) => {
+    console.warn("Couldn't load sync settings for Weekly Picks filtering:", err);
   });
 }
 
